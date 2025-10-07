@@ -926,6 +926,7 @@
   }
 
   function choose(indice, idPergunta, isTimeUp = false) {
+    // Para o timer imediatamente
     stopTimer();
 
     const botoes = document.querySelectorAll('.option-button');
@@ -937,11 +938,14 @@
       btn.style.pointerEvents = 'none';
     });
 
-    if (!isTimeUp && indice !== null) { // Se não foi por tempo esgotado, verifica a resposta
+    // Garante índice válido (0..botoes.length-1)
+    const indiceValido = Number.isInteger(indice) && indice >= 0 && indice < botoes.length;
+
+    if (!isTimeUp && indiceValido) {
       const botaoSelecionado = botoes[indice];
       isCorrect = (botaoSelecionado && botaoSelecionado.dataset.correct === 'true');
 
-      // Aplica estilo visual
+      // Feedback visual imediato
       if (isCorrect) {
         botaoSelecionado.classList.add('option-correct');
         showFeedback(true, "Correto! 🎉");
@@ -950,28 +954,40 @@
         showFeedback(false, "Incorreto! 😞");
       }
     } else {
-      // Feedback já foi mostrado por handleTimeUp ou resposta nula
-      isCorrect = false; // Tempo esgotado sempre é incorreto
+      // Foi por tempo esgotado ou índice inválido
+      isCorrect = false;
+      if (isTimeUp) {
+        // feedback do tempo já foi mostrado em handleTimeUp()
+      } else {
+        showFeedback(false, "Resposta inválida.");
+      }
     }
 
-    // Sempre mostra a resposta correta após a escolha (ou tempo esgotado)
+    // Sempre destaca a alternativa correta
     botoes.forEach(btn => {
       if (btn.dataset.correct === 'true') {
         btn.classList.add('option-correct');
       }
     });
 
-    // Salva no Apps Script (mantendo assinatura atual)
+    // Calcula tempo gasto nesta pergunta (base 30s) e envia para o Apps Script
+    // timeLeft já existe no seu código; clamp para garantir 0..30
+    const tempoGasto = Math.min(30, Math.max(0, 30 - (Number(timeLeft) || 0)));
+
+    // Se foi por tempo esgotado ou índice inválido, mandamos null
+    const indiceParaSalvar = (isTimeUp || !indiceValido) ? null : indice;
+
     google.script.run
       .withFailureHandler(showError)
-      .saveResposta(NOME, QUIZ, idPergunta, indice); // envia o índice escolhido ou null
+      .saveResposta(NOME, QUIZ, idPergunta, indiceParaSalvar, tempoGasto);
 
-    // Próxima pergunta após o delay
+    // Próxima pergunta após pequeno delay para o usuário ver o feedback
     setTimeout(() => {
-      currentQuestionIndex++; // Avança para a próxima pergunta
-      ask(); // continua o fluxo
+      currentQuestionIndex++;
+      ask();
     }, 3000);
   }
+
 
   function finish() {
     contentElement.innerHTML = `
