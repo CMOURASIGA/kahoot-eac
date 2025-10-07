@@ -167,165 +167,166 @@ function getPerguntaInfo(quizId, idPergunta) {
 /**
  * Grava uma resposta individual com informações completas para o dashboard
  */
-function saveResposta(nome, quizId, idPergunta, respostaIndex) {
+function saveResposta(nome, quizId, idPergunta, respostaIndex, tempoSegundos) {
   try {
-    console.log('💾 Salvando resposta:', { nome, quizId, idPergunta, respostaIndex });
-    
-    // Busca informações da pergunta
-    const perguntaInfo = getPerguntaInfo(quizId, idPergunta);
-    
+    // Garante a planilha de respostas e cabeçalho
     let respostasSheet = SS.getSheetByName('Respostas');
     if (!respostasSheet) {
-      // Cria a aba se não existir com as novas colunas
       respostasSheet = SS.insertSheet('Respostas');
-      respostasSheet.getRange(1, 1, 1, 8).setValues([
-        ['Timestamp', 'Nome_Jogador', 'ID_Quiz', 'ID_Pergunta', 'Resposta_Dada', 'Resposta Correta', 'Status', 'Pergunta']
-      ]);
+      respostasSheet.getRange(1, 1, 1, 10).setValues([[
+        'Timestamp',          // A
+        'Nome_Jogador',       // B
+        'ID_Quiz',            // C
+        'ID_Pergunta',        // D
+        'Resposta_Dada',      // E (A/B/C/D/TEMPO_ESGOTADO)
+        'Resposta Correta',   // F (A/B/C/D)
+        'Status',             // G (Correto/Errado/Tempo Esgotado)
+        'Pergunta',           // H (enunciado)
+        'Resposta_Idx',       // I (0..3)
+        'Tempo_Segundos'      // J (0..30)
+      ]]);
+    } else {
+      // Se a aba já existia, garante as colunas I e J
+      const header = respostasSheet.getRange(1, 1, 1, respostasSheet.getLastColumn()).getValues()[0];
+      const needed = ['Resposta_Idx','Tempo_Segundos'];
+      for (let need of needed) {
+        if (!header.includes(need)) {
+          respostasSheet.getRange(1, header.length + 1).setValue(need);
+        }
+      }
     }
-    
-    // Determina a resposta correta e o status
+
+    // Busca infos da pergunta (letra correta, índice correto, texto)
+    const perguntaInfo = getPerguntaInfo(quizId, idPergunta);
+
     let respostaCorreta = '';
     let status = '';
     let textoPergunta = '';
-    
+
     if (perguntaInfo) {
       respostaCorreta = perguntaInfo.letraCorreta || '';
       textoPergunta = perguntaInfo.pergunta || '';
-      
       if (respostaIndex === null || respostaIndex === 'TEMPO_ESGOTADO') {
         status = 'Tempo Esgotado';
       } else {
         status = (respostaIndex === perguntaInfo.indiceCorreto) ? 'Correto' : 'Errado';
       }
     }
-    
-    // Converte o índice da resposta para letra (0=A, 1=B, 2=C, 3=D)
+
+    // Converte índice para letra
     let respostaDada = '';
-    if (respostaIndex !== null && respostaIndex !== 'TEMPO_ESGOTADO' && typeof respostaIndex === 'number') {
-      respostaDada = String.fromCharCode(65 + respostaIndex); // 0=A, 1=B, etc.
+    if (typeof respostaIndex === 'number') {
+      respostaDada = String.fromCharCode(65 + respostaIndex); // 0=A, 1=B...
     } else if (respostaIndex === 'TEMPO_ESGOTADO' || respostaIndex === null) {
       respostaDada = 'TEMPO_ESGOTADO';
     }
-    
-    // Adiciona a linha com todas as informações
+
+    // Grava linha base (A:H)
     respostasSheet.appendRow([
-      new Date(),           // A: Timestamp
-      nome,                 // B: Nome_Jogador
-      quizId,              // C: ID_Quiz
-      idPergunta,          // D: ID_Pergunta
-      respostaDada,        // E: Resposta_Dada
-      respostaCorreta,     // F: Resposta Correta
-      status,              // G: Status
-      textoPergunta        // H: Pergunta
+      new Date(), nome, quizId, idPergunta, respostaDada, respostaCorreta, status, textoPergunta
     ]);
-    
-    console.log('✅ Resposta salva com sucesso:', {
-      respostaDada,
-      respostaCorreta,
-      status,
-      pergunta: textoPergunta
-    });
-    
+
+    // Preenche I e J (Resposta_Idx, Tempo_Segundos)
+    const lastRow = respostasSheet.getLastRow();
+    const idx = (typeof respostaIndex === 'number') ? respostaIndex : '';
+    const tempo = (typeof tempoSegundos === 'number') ? tempoSegundos : '';
+    respostasSheet.getRange(lastRow, 9).setValue(idx);    // I
+    respostasSheet.getRange(lastRow, 10).setValue(tempo); // J
+
+    // pronto!
   } catch (error) {
     console.error('❌ Erro em saveResposta:', error);
     throw new Error(`Erro ao salvar resposta: ${error.message}`);
   }
 }
 
+
 /**
  * Calcula e retorna o resultado final de um jogador
  */
 function finalizarQuiz(nome, quizId) {
   try {
-    console.log('🏁 Finalizando quiz para:', nome, quizId);
-    
-    // Busca o gabarito
-    const perguntasSheet = SS.getSheetByName('quiz_perguntas');
-    const perguntasData = perguntasSheet.getDataRange().getValues();
+    // 1) Gabarito com cache
+    const gabarito = getGabaritoComCache(quizId);
 
-    const gabarito = {};
-    perguntasData.slice(1).forEach(row => {
-      if (row[0] && row[0].toString().trim() === quizId.toString().trim()) {
-        const letra = row[7] ? row[7].toString().trim().toUpperCase() : null;
-        if (letra && ['A', 'B', 'C', 'D'].includes(letra)) {
-          gabarito[row[1]] = letra.charCodeAt(0) - 65; // Transforma 'A' em 0, 'B' em 1...
-        }
-      }
-    });
-
-    console.log('📋 Gabarito:', gabarito);
-
-    // Busca as respostas do jogador
+    // 2) Lê respostas do jogador
     const respostasSheet = SS.getSheetByName('Respostas');
     if (!respostasSheet) {
       throw new Error('Aba "Respostas" não encontrada');
     }
-    
     const respostasData = respostasSheet.getDataRange().getValues();
+    const header = respostasData[0];
+    const idxRespostaIdx = header.indexOf('Resposta_Idx');      // I
+    const idxRespostaDada = 4;                                   // E
+    const idxIdPergunta   = 3;                                   // D
     const respostasJogador = respostasData
-      .slice(1) // Remove cabeçalho
-      .filter(r => r[1] && r[2] && r[1].toString().trim() === nome.toString().trim() && r[2].toString().trim() === quizId.toString().trim());
+      .slice(1)
+      .filter(r => r[1] && r[2] &&
+        r[1].toString().trim() === nome.toString().trim() &&
+        r[2].toString().trim() === quizId.toString().trim());
 
-    console.log('📝 Respostas do jogador:', respostasJogador.length);
-
+    // 3) Consolida acertos
     let acertos = 0;
     respostasJogador.forEach(resp => {
-      const idPerg = resp[3];
-      const respostaIndex = resp[4];
-      
-      // Converte a resposta de letra para número se necessário
+      const idPerg = resp[idxIdPergunta];
+
+      // Preferir Resposta_Idx se existir
       let respostaNum = null;
-      if (respostaIndex && respostaIndex !== 'TEMPO_ESGOTADO') {
-        if (typeof respostaIndex === 'string' && respostaIndex.length === 1) {
-          // Se é uma letra (A, B, C, D)
-          const letra = respostaIndex.toUpperCase();
-          if (['A', 'B', 'C', 'D'].includes(letra)) {
-            respostaNum = letra.charCodeAt(0) - 65;
+      if (idxRespostaIdx >= 0 && typeof resp[idxRespostaIdx] === 'number') {
+        respostaNum = resp[idxRespostaIdx];
+      } else {
+        // fallback: converter letra de Resposta_Dada
+        const respostaIndex = resp[idxRespostaDada];
+        if (respostaIndex && respostaIndex !== 'TEMPO_ESGOTADO') {
+          if (typeof respostaIndex === 'string' && respostaIndex.length === 1) {
+            const letra = respostaIndex.toUpperCase();
+            if (['A','B','C','D'].includes(letra)) {
+              respostaNum = letra.charCodeAt(0) - 65;
+            }
+          } else if (typeof respostaIndex === 'number') {
+            respostaNum = respostaIndex;
           }
-        } else if (typeof respostaIndex === 'number') {
-          // Se já é um número
-          respostaNum = respostaIndex;
         }
       }
-      
+
       if (respostaNum !== null && gabarito[idPerg] === respostaNum) {
         acertos++;
       }
     });
 
     const totalPerguntas = Object.keys(gabarito).length;
-    console.log(`📊 Resultado: ${acertos}/${totalPerguntas} acertos`);
 
-    // Atualiza ou insere no Ranking
+    // 4) Atualiza Ranking (igual você já fazia)
     try {
       let rankSheet = SS.getSheetByName('Ranking');
       if (!rankSheet) {
         rankSheet = SS.insertSheet('Ranking');
         rankSheet.getRange(1, 1, 1, 3).setValues([['Nome', 'Quiz', 'Acertos']]);
       }
-      
+
       const dadosRank = rankSheet.getDataRange().getValues();
-      const linha = dadosRank.findIndex(r => r[0] && r[1] && r[0].toString().trim() === nome.toString().trim() && r[1].toString().trim() === quizId.toString().trim());
+      const linha = dadosRank.findIndex(r =>
+        r[0] && r[1] &&
+        r[0].toString().trim() === nome.toString().trim() &&
+        r[1].toString().trim() === quizId.toString().trim()
+      );
 
       if (linha >= 0) {
         rankSheet.getRange(linha + 1, 3).setValue(acertos);
-        console.log('📈 Ranking atualizado');
       } else {
         rankSheet.appendRow([nome, quizId, acertos]);
-        console.log('📈 Novo registro no ranking');
       }
     } catch (rankError) {
       console.warn('⚠️ Erro ao atualizar ranking:', rankError);
-      // Não interrompe o fluxo se houver erro no ranking
     }
 
     return { acertos, total: totalPerguntas };
-    
   } catch (error) {
     console.error('❌ Erro em finalizarQuiz:', error);
     throw new Error(`Erro ao finalizar quiz: ${error.message}`);
   }
 }
+
 
 /**
  * Retorna o ranking completo do quiz
@@ -510,3 +511,41 @@ function getUltimosResultados(quizId, limit) {
     return [];
   }
 }
+function getGabaritoComCache(quizId) {
+  const cache = CacheService.getScriptCache();
+  const key = `gabarito_${quizId}`;
+  const cached = cache.get(key);
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch (_) {
+      // se der erro de parse, segue fluxo e recalcula
+    }
+  }
+
+  // Calcula do zero
+  const perguntasSheet = SS.getSheetByName('quiz_perguntas');
+  if (!perguntasSheet) return {};
+
+  const perguntasData = perguntasSheet.getDataRange().getValues();
+  const gabarito = {};
+  perguntasData.slice(1).forEach(row => {
+    if (row[0] && row[0].toString().trim() === quizId.toString().trim()) {
+      const letra = row[7] ? row[7].toString().trim().toUpperCase() : null;
+      if (letra && ['A','B','C','D'].includes(letra)) {
+        gabarito[row[1]] = letra.charCodeAt(0) - 65; // A=0 ...
+      }
+    }
+  });
+
+  // Cache por 10 min (600s)
+  cache.put(key, JSON.stringify(gabarito), 600);
+  return gabarito;
+}
+function limparCacheGabarito(quizId) {
+  const cache = CacheService.getScriptCache();
+  cache.remove(`gabarito_${quizId}`);
+  return 'Cache limpo';
+}
+
+
