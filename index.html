@@ -4,7 +4,7 @@
   <base target="_top">
   <title>Quiz EAC - Gamificado</title>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
 
@@ -557,6 +557,133 @@
       z-index: 1001;
       animation: slideInUp 0.6s ease;
     }
+    /* Escalas fluidas com clamp: ajusta bem no celular */
+    :root{
+      --fs-xs: clamp(0.78rem, 0.72rem + 0.6vw, 0.9rem);
+      --fs-sm: clamp(0.9rem, 0.82rem + 0.7vw, 1.05rem);
+      --fs-md: clamp(1rem, 0.9rem + 0.8vw, 1.25rem);
+      --fs-lg: clamp(1.15rem, 1rem + 1vw, 1.5rem);
+      --radius-lg: 16px;
+      --gap-sm: 8px;
+      --gap-md: 12px;
+      --gap-lg: 16px;
+    }
+
+    /* Cartões principais (lista, pergunta, resultado, ranking) */
+    .quiz-card,
+    #content > .card,
+    #content .panel {
+      max-width: 680px;
+      margin: 0 auto;
+      border-radius: var(--radius-lg);
+    }
+
+    /* Botões mais “toqueáveis” no mobile */
+    .quiz-button{
+      min-height: 44px;           /* alvo de toque recomendado */
+      padding: 10px 14px;
+      font-size: var(--fs-sm);
+      border-radius: 12px;
+    }
+
+    /* Tabela do ranking com scroll horizontal seguro em telas estreitas */
+    .table-wrap{
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 12px;
+    }
+    .table-wrap table{
+      min-width: 420px;           /* evita quebrar demais em telas muito pequenas */
+    }
+
+    /* Pódio: mover estilos inline para classes para podermos responsivar melhor */
+    #podioBlock{ margin-top: 20px; }
+    .podio-grid{
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      justify-items: center;
+      align-items: end;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .podio-col{
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .podio-wrap{
+      height: 170px;              /* alinha a “base” dos tijolos */
+      width: 110px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .podio-bar{
+      width: 88px;
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.25);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .podio-bar span{
+      font-size: 18px;
+      color: #111;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .podio-list{
+      font-size: .92rem;
+      opacity: .95;
+      text-align: center;
+      max-width: 220px;
+    }
+
+    /* Ajustes por breakpoint */
+    @media (max-width: 768px){
+      .quiz-card,
+      #content > .card,
+      #content .panel { max-width: 92vw; }
+
+      h1{ font-size: var(--fs-lg); }
+      h2{ font-size: var(--fs-md); }
+      h3{ font-size: var(--fs-sm); }
+
+      /* Pódio compacta as colunas e reduz barras */
+      .podio-grid{
+        gap: 14px;
+        max-width: 92vw;
+      }
+      .podio-wrap{ height: 150px; width: 96px; }
+      .podio-bar{ width: 76px; }
+      .podio-list{ max-width: 200px; }
+    }
+
+    @media (max-width: 480px){
+      /* Empilha o pódio em 1 coluna no celular estreito */
+      .podio-grid{
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      .podio-wrap{ height: 130px; width: 88px; }
+      .podio-bar{ width: 70px; }
+      .podio-list{ max-width: 180px; }
+
+      /* Botões em coluna e 100% largura */
+      .actions-row{
+        display: grid !important;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      .quiz-button{ width: 100%; }
+    }
+
+    /* Respeitar “reduzir movimentos” do usuário */
+    @media (prefers-reduced-motion: reduce){
+      *{ animation: none !important; transition: none !important; }
+    }
+
   </style>
 </head>
 <body>
@@ -1010,46 +1137,40 @@
     let message = '';
     let emoji = '';
 
-    if (percentage >= 90) {
-      message = 'Excelente! Você é um expert!';
-      emoji = '🏆';
-      createConfetti();
-    } else if (percentage >= 70) {
-      message = 'Muito bom! Continue assim!';
-      emoji = '🎉';
-    } else if (percentage >= 50) {
-      message = 'Bom trabalho! Pode melhorar!';
-      emoji = '👍';
-    } else {
-      message = 'Precisa estudar mais!';
-      emoji = '📚';
-    }
+    if (percentage >= 90) { message = 'Excelente! Você é um expert!'; emoji = '🏆'; createConfetti(); }
+    else if (percentage >= 70) { message = 'Muito bom! Continue assim!'; emoji = '🎉'; }
+    else if (percentage >= 50) { message = 'Bom trabalho! Pode melhorar!'; emoji = '👍'; }
+    else { message = 'Precisa estudar mais!'; emoji = '📚'; }
 
     contentElement.innerHTML = `
-      <div style="text-align: center;">
-        <div style="font-size: 4rem; margin-bottom: 20px;">${emoji}</div>
+      <div style="text-align:center;">
+        <div style="font-size:4rem; margin-bottom:20px;">${emoji}</div>
         <h2>Quiz Finalizado!</h2>
-        <div style="font-size: 2rem; margin: 20px 0; color: var(--accent-color);">
+        <div style="font-size:2rem; margin:20px 0; color: var(--accent-color);">
           ${resultado.acertos} acertos de ${resultado.total} perguntas
         </div>
-        <div style="font-size: 1.2rem; margin-bottom: 30px;">
-          ${Math.round(percentage)}% de acertos
-        </div>
-        <p style="font-size: 1.1rem; margin-bottom: 30px;">${message}</p>
+        <div style="font-size:1.2rem; margin-bottom:30px;">${Math.round(percentage)}% de acertos</div>
+        <p style="font-size:1.1rem; margin-bottom:24px;">${message}</p>
 
-        <button class="quiz-button" onclick="reiniciar()">
-          🔄 Jogar Novamente
-        </button>
-        <button class="quiz-button" onclick="shareResults()" style="background: var(--success-color); color: white;">
-          📱 Compartilhar Resultado
-        </button>
-        <!-- NOVO botão: ver ranking deste quiz -->
-        <button class="quiz-button" onclick="showRanking('${QUIZ}')">
-          📊 Ver Ranking do Quiz
-        </button>
+        <button class="quiz-button" onclick="reiniciar()">🔄 Jogar Novamente</button>
+        <button class="quiz-button" onclick="shareResults()" style="background: var(--success-color); color:#fff;">📱 Compartilhar Resultado</button>
+        <button class="quiz-button" onclick="showRanking('${QUIZ}')">📊 Ver Ranking do Quiz</button>
+
+        <!-- Bloco do PÓDIO -->
+        <div id="podioBlock" style="margin-top:28px;">
+          <h3 style="margin-bottom:10px;">🥇🥈🥉 Top 3 do Quiz</h3>
+          <div id="podioContent" style="min-height:120px;">
+            <div class="loading"></div>
+            <p>Carregando pódio...</p>
+          </div>
+        </div>
       </div>
     `;
+
+    // carrega o pódio com base no ranking atual
+    loadPodio(QUIZ);
   }
+
 
   function showError(error) {
     contentElement.innerHTML = `
@@ -1084,18 +1205,26 @@
   function showRanking(quizId, nomeFormatado = '') {
     contentElement.innerHTML = `
       <div class="loading"></div>
-      <p>Carregando resultados...</p>
+      <p>Recalculando e carregando resultados...</p>
     `;
 
     google.script.run
-      .withSuccessHandler((dados) => renderRanking(quizId, nomeFormatado, dados))
+      .withSuccessHandler(() => {
+        google.script.run
+          .withSuccessHandler((dados) => renderRanking(quizId, nomeFormatado, dados))
+          .withFailureHandler(showError)
+          .getRanking(quizId);
+      })
       .withFailureHandler(showError)
-      .getRanking(quizId);
+      .recomputarRankingQuiz(quizId);
   }
 
-  // Renderiza a tela de ranking e inclui "Atividade recente"
+
   function renderRanking(quizId, nomeFormatado, ranking) {
     const titulo = nomeFormatado || quizId;
+
+    // pódio direto do array "ranking"
+    const podioHTML = renderPodioFromRanking(ranking);
 
     const tabelaRanking = (!ranking || ranking.length === 0) ? `
       <p style="opacity:.9;margin:8px 0 16px;">Ainda não há registros no ranking para este quiz.</p>
@@ -1124,7 +1253,13 @@
 
     contentElement.innerHTML = `
       <h2>📊 Resultados — ${titulo}</h2>
+
+      <!-- Pódio do Top 3 -->
+      ${podioHTML}
+
+      <!-- Tabela completa -->
       ${tabelaRanking}
+
       <div style="display:flex; gap:8px; justify-content:center; margin:12px 0 24px;">
         <button class="quiz-button" onclick="startQuiz('${quizId}')">▶️ Jogar</button>
         <button class="quiz-button" onclick="loadQuizzesList()">🔙 Voltar</button>
@@ -1138,7 +1273,7 @@
       </div>
     `;
 
-    // Carrega a atividade recente deste quiz
+    // Continua carregando a "Atividade recente" async (como antes)
     google.script.run
       .withSuccessHandler((rows) => {
         const host = document.getElementById('recentActivity');
@@ -1171,8 +1306,280 @@
         const host = document.getElementById('recentActivity');
         host.innerHTML = `<p class="error-message">Falha ao carregar atividade.</p>`;
       })
-      .getUltimosResultados(quizId, 30); // função nova no Apps Script
+      .getUltimosResultados(quizId, 30);
   }
+// ===== Helpers robustos (no escopo global) =====
+window.showDevError = function (where, err) {
+  console.error(`[${where}]`, err);
+  const host = document.getElementById('content') || contentElement;
+  if (host) {
+    host.innerHTML = `
+      <div class="error-message">
+        <h3>Erro ao montar a tela</h3>
+        <p style="word-break:break-word;">${(err && err.message) ? err.message : String(err)}</p>
+        <button class="quiz-button" onclick="loadQuizzesList()">🔙 Voltar</button>
+      </div>
+    `;
+  }
+};
+
+window.computePlacements = function (items) {
+  if (!Array.isArray(items)) return [];
+  const places = [];
+  let last = null;
+  let lastPlace = 0;
+  for (let i = 0; i < items.length; i++) {
+    const cur = items[i] || {};
+    const isTie = last
+      && Number(cur.pontos) === Number(last.pontos)
+      && (
+        (cur.tempo == null && last.tempo == null) ||
+        (typeof cur.tempo === 'number' && typeof last.tempo === 'number' && cur.tempo === last.tempo)
+      );
+    lastPlace = isTie ? lastPlace : (i + 1);
+    places.push(lastPlace);
+    last = cur;
+  }
+  return places;
+};
+
+function renderPodioFromRanking(ranking) {
+  try {
+    if (!Array.isArray(ranking) || ranking.length === 0) {
+      return `
+        <div id="podioBlock" style="margin-top:24px;">
+          <h3 style="margin-bottom:10px;">🥇🥈🥉 Top 3 do Quiz</h3>
+          <p style="opacity:.85;">Ainda não há participantes no ranking.</p>
+        </div>
+      `;
+    }
+
+    // usa a função computePlacements(ranking) que já criamos
+    const places = computePlacements(ranking);
+    const distinctPlaces = [...new Set(places)].slice(0, 3); // 1º, 2º, 3º
+    const buckets = distinctPlaces.map(p => ranking.filter((_, i) => places[i] === p));
+
+    // estilos por lugar
+    const styleByPlace = (place) => {
+      return {
+        barH: place === 1 ? 140 : place === 2 ? 110 : 90,
+        color: place === 1 ? '#f0c419' : place === 2 ? '#c0c6cf' : '#d59b6a',
+        label: place === 1 ? '🥇 1º' : place === 2 ? '🥈 2º' : '🥉 3º'
+      };
+    };
+
+    const makeColumn = (place, group) => {
+      const s = styleByPlace(place);
+
+      if (!group || !group.length) {
+        return `
+          <div class="podio-col">
+            <div class="podio-wrap">
+              <div class="podio-bar" style="height:${s.barH}px; background:rgba(255,255,255,.10);">
+                <span style="opacity:.6;">—</span>
+              </div>
+            </div>
+            <div style="margin-top:8px; font-weight:800; text-align:center;">${s.label}</div>
+            <div class="podio-list" style="opacity:.6;">—</div>
+          </div>
+        `;
+      }
+
+      const itens = group.map(item => {
+        const nome = (item?.nome || '').toString();
+        const nomeCurto = nome.length > 22 ? nome.slice(0, 20) + '…' : nome;
+        const tempoTxt = typeof item.tempo === 'number' ? ` · ${item.tempo.toFixed(1)}s` : '';
+        const pontos = typeof item.pontos === 'number' ? item.pontos : (Number(item.pontos) || 0);
+        return `
+          <div style="display:flex; align-items:center; gap:6px; justify-content:center; margin:4px 0;">
+            <span style="font-weight:700;">${pontos} pts</span>
+            <span style="opacity:.65;">—</span>
+            <span title="${nome}">${nomeCurto}${tempoTxt}</span>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="podio-col">
+          <div class="podio-wrap">
+            <div class="podio-bar" style="height:${s.barH}px; background:${s.color};">
+              <span>${group[0].pontos}</span>
+            </div>
+          </div>
+          <div style="margin-top:8px; font-weight:800; text-align:center;">${s.label}</div>
+          <div class="podio-list">
+            ${itens}
+          </div>
+        </div>
+      `;
+    };
+
+    // ordem visual: 2º | 1º | 3º (se existirem)
+    const have1 = buckets[0]?.length;
+    const have2 = buckets[1]?.length;
+    const have3 = buckets[2]?.length;
+
+    const col2 = have2 ? makeColumn(2, buckets[1]) : makeColumn(2, []);
+    const col1 = have1 ? makeColumn(1, buckets[0]) : makeColumn(1, []);
+    const col3 = have3 ? makeColumn(3, buckets[2]) : makeColumn(3, []);
+
+    return `
+      <div id="podioBlock" style="margin-top:24px;">
+        <h3 style="margin-bottom:12px;">🥇🥈🥉 Top 3 do Quiz</h3>
+        <div class="podio-grid">
+          ${col2}
+          ${col1}
+          ${col3}
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    console.error('renderPodioFromRanking error:', e);
+    return `
+      <div id="podioBlock" style="margin-top:24px;">
+        <h3 style="margin-bottom:10px;">🥇🥈🥉 Top 3 do Quiz</h3>
+        <p class="error-message">Falha ao montar o pódio.</p>
+      </div>
+    `;
+  }
+}
+
+
+
+// ===== Fluxo principal do Ranking =====
+window.showRanking = function (quizId, nomeFormatado = '') {
+  try {
+    contentElement.innerHTML = `
+      <div class="loading"></div>
+      <p>Carregando resultados...</p>
+    `;
+
+    google.script.run
+      .withSuccessHandler((dados) => {
+        try {
+          // normaliza retorno
+          const ranking = Array.isArray(dados) ? dados : [];
+          renderRanking(quizId, nomeFormatado, ranking);
+        } catch (e) {
+          showDevError('showRanking/successHandler', e);
+        }
+      })
+      .withFailureHandler((err) => {
+        showDevError('showRanking/failureHandler', err);
+      })
+      .getRanking(quizId);
+  } catch (e) {
+    showDevError('showRanking', e);
+  }
+};
+
+window.renderRanking = function (quizId, nomeFormatado, ranking) {
+  try {
+    const titulo = nomeFormatado || quizId;
+
+    const podioHTML = renderPodioFromRanking(ranking);
+
+    const hdrTempo = Array.isArray(ranking) && ranking.some(r => typeof r.tempo === 'number');
+    const headerExtra = hdrTempo ? `<th style="padding:10px; text-align:center;">Tempo médio (s)</th>` : '';
+
+    const places = computePlacements(ranking || []);
+
+    const linhas = (!ranking || ranking.length === 0) ? '' : ranking.map((r,i) => `
+      <tr>
+        <td style="padding:10px; text-align:center; font-weight:700;">${places[i]}</td>
+        <td style="padding:10px;">${r.nome}</td>
+        <td style="padding:10px; text-align:center;">${r.pontos}</td>
+        ${hdrTempo ? `<td style="padding:10px; text-align:center;">${(typeof r.tempo === 'number') ? r.tempo.toFixed(1) : '—'}</td>` : ''}
+      </tr>
+    `).join('');
+
+    const tabelaRanking = (!ranking || ranking.length === 0) ? `
+      <p style="opacity:.9;margin:8px 0 16px;">Ainda não há registros no ranking para este quiz.</p>
+    ` : `
+      <div style="overflow:auto; margin:12px 0;">
+        <table style="width:100%; border-collapse:separate; border-spacing:0; border-radius:12px; overflow:hidden;">
+          <thead style="background:rgba(255,255,255,.15);">
+            <tr>
+              <th style="padding:10px; text-align:center;">#</th>
+              <th style="padding:10px; text-align:left;">Nome</th>
+              <th style="padding:10px; text-align:center;">Acertos</th>
+              ${headerExtra}
+            </tr>
+          </thead>
+          <tbody style="background:rgba(255,255,255,.08);">
+            ${linhas}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    contentElement.innerHTML = `
+      <h2>📊 Resultados — ${titulo}</h2>
+
+      ${podioHTML}
+
+      ${tabelaRanking}
+
+      <div style="display:flex; gap:8px; justify-content:center; margin:12px 0 24px;">
+        <button class="quiz-button" onclick="startQuiz('${quizId}')">▶️ Jogar</button>
+        <button class="quiz-button" onclick="loadQuizzesList()">🔙 Voltar</button>
+        <button class="quiz-button" onclick="showRanking('${quizId}','${nomeFormatado}')">🔁 Atualizar</button>
+      </div>
+
+      <h3 style="margin-top:6px;">🕒 Atividade recente</h3>
+      <div id="recentActivity" style="margin-top:8px;">
+        <div class="loading"></div>
+        <p>Carregando atividade...</p>
+      </div>
+    `;
+
+    // carrega atividade DEPOIS de pintar ranking
+    const host = document.getElementById('recentActivity');
+    if (host) {
+      setTimeout(() => {
+        google.script.run
+          .withSuccessHandler((rows) => {
+            try {
+              if (!rows || !rows.length) {
+                host.innerHTML = `<p style="opacity:.9;">Sem atividade recente.</p>`;
+                return;
+              }
+              const linhas = rows.map(r => `
+                <tr>
+                  <td style="padding:8px">${new Date(r.timestamp).toLocaleString()}</td>
+                  <td style="padding:8px">${r.nome}</td>
+                  <td style="padding:8px">${r.idPergunta}</td>
+                  <td style="padding:8px">${r.status}</td>
+                  <td style="padding:8px">${r.respostaDada}</td>
+                  <td style="padding:8px">${r.respostaCorreta}</td>
+                </tr>
+              `).join('');
+              host.innerHTML = `
+                <div style="overflow:auto;">
+                  <table style="width:100%;border-collapse:collapse;">
+                    <thead><tr>
+                      <th>Quando</th><th>Nome</th><th>Pergunta</th><th>Status</th><th>Dada</th><th>Correta</th>
+                    </tr></thead>
+                    <tbody>${linhas}</tbody>
+                  </table>
+                </div>
+              `;
+            } catch (e) {
+              showDevError('renderRanking/successHandler getUltimosResultados', e);
+            }
+          })
+          .withFailureHandler((err) => {
+            host.innerHTML = `<p class="error-message">Falha ao carregar atividade.</p>`;
+            console.error('getUltimosResultados failure', err);
+          })
+          .getUltimosResultados(quizId, 30);
+      }, 200);
+    }
+  } catch (e) {
+    showDevError('renderRanking', e);
+  }
+};
+
 </script>  
 </body>
 </html>
