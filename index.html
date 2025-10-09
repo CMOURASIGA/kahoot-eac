@@ -2,733 +2,223 @@
 <html lang="pt-BR">
 <head>
   <base target="_top">
-  <title>Quiz EAC - Gamificado</title>
   <meta charset="UTF-8">
+  <title>EAC Quiz</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
-
-    :root {
-      --primary-color: #0B2043;
-      --secondary-color: #D72638;
-      --accent-color: #f59e0b;
-      --success-color: #10b981;
-      --error-color: #ef4444;
-      --warning-color: #f59e0b;
-      --text-light: #ffffff;
-      --text-dark: #1f2937;
-      --bg-gradient: linear-gradient(135deg, #0f325a 0%, #0B2043 100%);
-      --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.2);
-      --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.3);
-      --border-radius: 16px;
-      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Nunito', sans-serif;
-      background: var(--bg-gradient);
-      color: var(--text-light);
-      text-align: center;
-      padding: 20px;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      overflow-x: hidden;
-    }
-
-    /* Animações de entrada */
-    @keyframes slideInUp {
-      from {
-        opacity: 0;
-        transform: translateY(30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    @keyframes pulse {
-      0%, 100% {
-        transform: scale(1);
-      }
-      50% {
-        transform: scale(1.05);
-      }
-    }
-
-    @keyframes bounce {
-      0%, 20%, 53%, 80%, 100% {
-        transform: translateY(0);
-      }
-      40%, 43% {
-        transform: translateY(-10px);
-      }
-      70% {
-        transform: translateY(-5px);
-      }
-      90% {
-        transform: translateY(-2px);
-      }
-    }
-
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-      20%, 40%, 60%, 80% { transform: translateX(5px); }
-    }
-
-    @keyframes confetti {
-      0% {
-        transform: translateY(-100vh) rotate(0deg);
-        opacity: 1;
-      }
-      100% {
-        transform: translateY(100vh) rotate(720deg);
-        opacity: 0;
-      }
-    }
-
-    /* Header com logo e pontuação */
-    .header {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      padding: 15px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      z-index: 1000;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    }
-
-    .logo-container {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .logo-eac {
-      max-width: 60px;
-      height: auto;
-      border-radius: 8px;
-    }
-
-    .score-display {
-      background: rgba(255, 255, 255, 0.2);
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-weight: 700;
-      font-size: 18px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .score-icon {
-      font-size: 20px;
-    }
-
-    /* Container principal */
-    #tela {
-      max-width: 700px;
-      width: 100%;
-      margin: 100px auto 20px;
-      background: rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(20px);
-      padding: 40px;
-      border-radius: var(--border-radius);
-      box-shadow: var(--shadow-xl);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      animation: slideInUp 0.6s ease-out;
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* Barra de progresso */
-    .progress-container {
-      margin-bottom: 30px;
-      position: relative;
-    }
-
-    .progress-bar {
-      width: 100%;
-      height: 12px;
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 6px;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--success-color), var(--accent-color));
-      border-radius: 6px;
-      transition: width 0.5s ease;
-      position: relative;
-    }
-
-    .progress-fill::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-      animation: shimmer 2s infinite;
-    }
-
-    @keyframes shimmer {
-      0% { transform: translateX(-100%); }
-      100% { transform: translateX(100%); }
-    }
-
-    .progress-text {
-      margin-top: 8px;
-      font-size: 14px;
-      opacity: 0.9;
-    }
-
-    /* Timer */
-    .timer-container {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      background: var(--warning-color);
-      color: var(--text-dark);
-      padding: 8px 12px;
-      border-radius: 20px;
-      font-weight: 700;
-      font-size: 16px;
-      min-width: 60px;
-      animation: pulse 1s infinite;
-    }
-
-    .timer-urgent {
-      background: var(--error-color);
-      color: var(--text-light);
-      animation: pulse 0.5s infinite;
-    }
-
-    /* Títulos */
-    h1, h2, h3 {
-      color: var(--text-light);
-      margin-bottom: 20px;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    }
-
-    h1 {
-      font-size: 2.5rem;
-      font-weight: 800;
-      margin-bottom: 10px;
-      background: linear-gradient(45deg, #fff, #f0f9ff);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    h2 {
-      font-size: 1.8rem;
-      font-weight: 700;
-      line-height: 1.3;
-    }
-
-    /* Botões principais */
-    button {
-      background: var(--text-light);
-      border: none;
-      color: var(--text-dark);
-      font-weight: 700;
-      font-size: 16px;
-      padding: 14px 24px;
-      margin: 8px;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: var(--transition);
-      position: relative;
-      overflow: hidden;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-
-    button::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-      transition: left 0.5s;
-    }
-
-    button:hover::before {
-      left: 100%;
-    }
-
-    button:hover {
-      background: var(--accent-color);
-      color: var(--text-light);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
-    }
-
-    button:active {
-      transform: translateY(0);
-    }
-
-    .quiz-button {
-      display: inline-block;
-      width: 90%;
-      max-width: 350px;
-      font-size: 18px;
-      padding: 16px 24px;
-    }
-
-    /* Grid de opções */
-    .options {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin-top: 30px;
-    }
-
-    .option-button {
-      font-size: 18px;
-      font-weight: 700;
-      padding: 24px 20px;
-      color: var(--text-light);
-      border: none;
-      border-radius: 16px;
-      cursor: pointer;
-      transition: var(--transition);
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-      min-height: 80px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-    }
-
-    /* Cores das opções estilo Kahoot */
-    .option-red    { 
-      background: linear-gradient(135deg, #e53e3e, #c53030);
-    }
-    .option-blue   { 
-      background: linear-gradient(135deg, #3182ce, #2c5282);
-    }
-    .option-yellow { 
-      background: linear-gradient(135deg, #d69e2e, #b7791f);
-      color: var(--text-dark);
-    }
-    .option-green  { 
-      background: linear-gradient(135deg, #38a169, #2f855a);
-    }
-
-    .option-button:hover {
-      transform: translateY(-4px) scale(1.02);
-      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
-    }
-
-    .option-button:active {
-      transform: translateY(-2px) scale(0.98);
-    }
-
-    /* Ícones das opções */
-    .option-icon {
-      font-size: 24px;
-      font-weight: bold;
-    }
-
-    .option-red .option-icon::before    { content: "▲"; }
-    .option-blue .option-icon::before   { content: "♦"; }
-    .option-yellow .option-icon::before { content: "●"; }
-    .option-green .option-icon::before  { content: "■"; }
-
-    /* Estados de feedback */
-    .option-correct {
-      background: linear-gradient(135deg, var(--success-color), #059669) !important;
-      animation: bounce 0.6s ease;
-    }
-
-    .option-incorrect {
-      background: linear-gradient(135deg, var(--error-color), #dc2626) !important;
-      animation: shake 0.6s ease;
-    }
-
-    .option-disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none !important;
-    }
-
-    /* Feedback visual */
-    .feedback-container {
-      margin-top: 20px;
-      padding: 20px;
-      border-radius: 12px;
-      font-weight: 600;
-      font-size: 18px;
-      animation: slideInUp 0.4s ease;
-    }
-
-    .feedback-correct {
-      background: rgba(16, 185, 129, 0.2);
-      border: 2px solid var(--success-color);
-      color: var(--success-color);
-    }
-
-    .feedback-incorrect {
-      background: rgba(239, 68, 68, 0.2);
-      border: 2px solid var(--error-color);
-      color: var(--error-color);
-    }
-
-    /* Confetti para acertos */
-    .confetti {
-      position: fixed;
-      width: 10px;
-      height: 10px;
-      background: var(--accent-color);
-      animation: confetti 3s linear infinite;
-      z-index: 1000;
-    }
-
-    .confetti:nth-child(odd) {
-      background: var(--success-color);
-      animation-delay: 0.5s;
-    }
-
-    .confetti:nth-child(3n) {
-      background: var(--primary-color);
-      animation-delay: 1s;
-    }
-
-    /* Mensagens de erro */
-    .error-message {
-      background: rgba(239, 68, 68, 0.2);
-      border: 1px solid var(--error-color);
-      padding: 20px;
-      border-radius: 12px;
-      margin-top: 20px;
-      animation: slideInUp 0.4s ease;
-    }
-
-    /* Responsividade */
-    @media screen and (max-width: 768px) {
-      body {
-        padding: 10px;
-      }
-
-      .header {
-        padding: 10px 15px;
-      }
-
-      .logo-eac {
-        max-width: 50px;
-      }
-
-      .score-display {
-        font-size: 16px;
-        padding: 6px 12px;
-      }
-
-      #tela {
-        padding: 25px;
-        margin: 80px auto 20px;
-      }
-
-      .timer-container {
-        top: 15px;
-        right: 15px;
-        font-size: 14px;
-        padding: 6px 10px;
-      }
-
-      h1 {
-        font-size: 2rem;
-      }
-
-      h2 {
-        font-size: 1.4rem;
-      }
-
-      .option-button {
-        font-size: 16px;
-        padding: 20px 15px;
-        min-height: 70px;
-      }
-
-      .options {
-        grid-template-columns: 1fr;
-        gap: 15px;
-      }
-
-      .quiz-button {
-        width: 100%;
-        font-size: 16px;
-      }
-    }
-
-    @media screen and (max-width: 480px) {
-      #tela {
-        padding: 20px;
-      }
-
-      .option-button {
-        font-size: 14px;
-        padding: 16px 12px;
-        min-height: 60px;
-      }
-
-      h1 {
-        font-size: 1.8rem;
-      }
-
-      h2 {
-        font-size: 1.2rem;
-      }
-    }
-
-    /* Efeitos especiais */
-    .celebration {
-      animation: bounce 0.6s ease;
-    }
-
-    .streak-indicator {
-      position: absolute;
-      top: -10px;
-      right: -10px;
-      background: var(--accent-color);
-      color: var(--text-dark);
-      border-radius: 50%;
-      width: 30px;
-      height: 30px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 12px;
-      animation: pulse 1s infinite;
-    }
-
-    /* Loading state */
-    .loading {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(255, 255, 255, 0.3);
-      border-radius: 50%;
-      border-top-color: var(--text-light);
-      animation: spin 1s ease-in-out infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* Badges de conquista */
-    .achievement-badge {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: var(--accent-color);
-      color: var(--text-dark);
-      padding: 20px 30px;
-      border-radius: 16px;
-      font-weight: 700;
-      font-size: 18px;
-      box-shadow: var(--shadow-xl);
-      z-index: 1001;
-      animation: slideInUp 0.6s ease;
-    }
-    /* Escalas fluidas com clamp: ajusta bem no celular */
     :root{
-      --fs-xs: clamp(0.78rem, 0.72rem + 0.6vw, 0.9rem);
-      --fs-sm: clamp(0.9rem, 0.82rem + 0.7vw, 1.05rem);
-      --fs-md: clamp(1rem, 0.9rem + 0.8vw, 1.25rem);
-      --fs-lg: clamp(1.15rem, 1rem + 1vw, 1.5rem);
-      --radius-lg: 16px;
-      --gap-sm: 8px;
-      --gap-md: 12px;
-      --gap-lg: 16px;
+      --blue-900:#0B2043;
+      --blue-800:#10345f;
+      --blue-700:#1565C0;
+      --red-600:#E53935;
+      --gold-500:#f0c419;
+      --green-500:#10b981;
+      --amber-500:#f59e0b;
+      --glass: rgba(255,255,255,.14);
+      --glass-border: rgba(255,255,255,.18);
+      --text:#fff;
+      --text-dark:#111827;
+      --shadow: 0 18px 50px rgba(0,0,0,.35);
+      --radius: 18px;
+
+      --fs-xs: clamp(.82rem, .72rem + .6vw, .95rem);
+      --fs-sm: clamp(.95rem, .9rem + .4vw, 1.05rem);
+      --fs-md: clamp(1.05rem, 1rem + .8vw, 1.28rem);
+      --fs-lg: clamp(1.4rem, 1.2rem + 1.4vw, 2.1rem);
+      --fs-xl: clamp(2.1rem, 1.7rem + 2.8vw, 3.2rem);
     }
 
-    /* Cartões principais (lista, pergunta, resultado, ranking) */
-    .quiz-card,
-    #content > .card,
-    #content .panel {
-      max-width: 680px;
-      margin: 0 auto;
-      border-radius: var(--radius-lg);
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    body{
+      font-family:'Poppins',system-ui,Segoe UI,Roboto,Arial,sans-serif;
+      color:var(--text);
+      background: linear-gradient(180deg, var(--blue-800) 0%, var(--blue-900) 100%);
+      min-height:100vh;
+      display:flex; flex-direction:column;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
     }
 
-    /* Botões mais “toqueáveis” no mobile */
-    .quiz-button{
-      min-height: 44px;           /* alvo de toque recomendado */
-      padding: 10px 14px;
-      font-size: var(--fs-sm);
-      border-radius: 12px;
+    /* Header */
+    .header{
+      position:fixed; inset:0 0 auto 0; height:64px; z-index:50;
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 16px; background:rgba(255,255,255,.08);
+      backdrop-filter: blur(10px); border-bottom:1px solid var(--glass-border);
+    }
+    .logo-row{ display:flex; align-items:center; gap:10px; }
+    .logo-eac{ width:44px; height:44px; border-radius:10px; object-fit:cover; }
+    .brand{ font-weight:800; letter-spacing:.3px; }
+
+    .score-chip{
+      background:rgba(255,255,255,.2); border:1px solid var(--glass-border);
+      padding:6px 12px; border-radius:999px; font-weight:800; display:flex; align-items:center; gap:8px;
     }
 
-    /* Tabela do ranking com scroll horizontal seguro em telas estreitas */
-    .table-wrap{
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      border-radius: 12px;
+    /* Container */
+    .container{ width:100%; max-width:900px; margin:84px auto 24px; padding:0 16px; }
+
+    /* Hero */
+    .hero{
+      text-align:center; padding:36px 18px 22px;
+      background:var(--glass); border:1px solid var(--glass-border);
+      border-radius:var(--radius); box-shadow:var(--shadow);
     }
-    .table-wrap table{
-      min-width: 420px;           /* evita quebrar demais em telas muito pequenas */
+    .hero h1{ font-size:var(--fs-xl); line-height:1.1; margin:8px 0 8px; }
+    .hero .sub{ font-size:var(--fs-md); opacity:.92; }
+
+    .hero-cta{ margin:26px 0 12px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+    .btn{
+      background:#fff; color:var(--text-dark);
+      border:none; border-radius:12px; font-weight:800;
+      padding:14px 20px; cursor:pointer; transition:.25s transform, .25s filter;
+      box-shadow:0 10px 22px rgba(0,0,0,.22);
+    }
+    .btn:hover{ transform:translateY(-2px); filter:brightness(1.02); }
+    .btn.primary{ background:linear-gradient(135deg,#4f46e5,#06b6d4); color:#fff; }
+    .btn.dark{ background:#111827; color:#fff; }
+
+    .stats{ display:flex; gap:18px; justify-content:center; opacity:.95; margin-top:6px; }
+    .stat b{ display:block; font-size:1.35rem; }
+
+    /* Card principal */
+    #tela{
+      margin-top:18px; background:var(--glass); border:1px solid var(--glass-border);
+      border-radius:var(--radius); box-shadow:var(--shadow);
+      padding:28px; position:relative; overflow:hidden;
     }
 
-    /* Pódio: mover estilos inline para classes para podermos responsivar melhor */
-    #podioBlock{ margin-top: 20px; }
-    .podio-grid{
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 18px;
-      justify-items: center;
-      align-items: end;
-      max-width: 720px;
-      margin: 0 auto;
-    }
-    .podio-col{
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .podio-wrap{
-      height: 170px;              /* alinha a “base” dos tijolos */
-      width: 110px;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-    }
-    .podio-bar{
-      width: 88px;
-      border-radius: 12px;
-      box-shadow: 0 6px 18px rgba(0,0,0,.25);
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-    }
-    .podio-bar span{
-      font-size: 18px;
-      color: #111;
-      font-weight: 800;
-      margin-bottom: 8px;
-    }
-    .podio-list{
-      font-size: .92rem;
-      opacity: .95;
-      text-align: center;
-      max-width: 220px;
-    }
+    /* Progresso + timer */
+    .progress{ margin-bottom:18px; }
+    .bar{ height:12px; background:rgba(255,255,255,.2); border-radius:6px; overflow:hidden; }
+    .fill{ height:100%; width:0%; background:linear-gradient(90deg, var(--green-500), var(--amber-500)); transition:width .4s ease; }
+    .progress small{ display:block; margin-top:8px; opacity:.9; }
 
-    /* Ajustes por breakpoint */
-    @media (max-width: 768px){
-      .quiz-card,
-      #content > .card,
-      #content .panel { max-width: 92vw; }
+    .timer{ position:absolute; top:16px; right:16px; background:var(--amber-500); color:#111;
+      font-weight:800; padding:6px 10px; border-radius:999px; min-width:56px; text-align:center; }
+    .timer.urgent{ background:var(--red-600); color:#fff; animation:pulse .8s infinite; }
+    @keyframes pulse{ 0%,100%{ transform:scale(1)} 50%{ transform:scale(1.06)} }
 
-      h1{ font-size: var(--fs-lg); }
-      h2{ font-size: var(--fs-md); }
-      h3{ font-size: var(--fs-sm); }
-
-      /* Pódio compacta as colunas e reduz barras */
-      .podio-grid{
-        gap: 14px;
-        max-width: 92vw;
-      }
-      .podio-wrap{ height: 150px; width: 96px; }
-      .podio-bar{ width: 76px; }
-      .podio-list{ max-width: 200px; }
+    /* Opções */
+    .options{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:18px; }
+    .option{
+      min-height:74px; border-radius:16px; display:flex; align-items:center; justify-content:center; gap:12px;
+      color:#fff; font-weight:800; font-size:1rem; cursor:pointer; border:none;
+      box-shadow:0 12px 28px rgba(0,0,0,.25); transition:transform .2s, filter .2s;
     }
+    .option:hover{ transform:translateY(-2px); filter:brightness(1.05); }
+    .option.red{ background:linear-gradient(135deg,#e53e3e,#b91c1c) }
+    .option.blue{ background:linear-gradient(135deg,#2563eb,#1e40af) }
+    .option.yellow{ background:linear-gradient(135deg,#f59e0b,#b45309); color:#111 }
+    .option.green{ background:linear-gradient(135deg,#10b981,#047857) }
+    .correct{ background:linear-gradient(135deg,#10b981,#059669)!important; }
+    .incorrect{ background:linear-gradient(135deg,#ef4444,#dc2626)!important; }
+    .disabled{ opacity:.6; pointer-events:none; }
 
-    @media (max-width: 480px){
-      /* Empilha o pódio em 1 coluna no celular estreito */
-      .podio-grid{
-        grid-template-columns: 1fr;
-        gap: 12px;
-      }
-      .podio-wrap{ height: 130px; width: 88px; }
-      .podio-bar{ width: 70px; }
-      .podio-list{ max-width: 180px; }
+    .feedback{ margin-top:16px; padding:14px; border-radius:12px; font-weight:700; }
+    .ok{ background:rgba(16,185,129,.2); border:1px solid #10b981; color:#10b981; }
+    .err{ background:rgba(239,68,68,.2); border:1px solid #ef4444; color:#ef4444; }
 
-      /* Botões em coluna e 100% largura */
-      .actions-row{
-        display: grid !important;
-        grid-template-columns: 1fr;
-        gap: 10px;
-      }
-      .quiz-button{ width: 100%; }
+    /* Tabela */
+    .table-wrap{ overflow:auto; -webkit-overflow-scrolling:touch; border-radius:12px; }
+    table{ width:100%; border-collapse:separate; border-spacing:0; }
+    thead{ background:rgba(255,255,255,.15); }
+    tbody{ background:rgba(255,255,255,.08); }
+    th,td{ padding:10px; }
+    th{ text-align:left; }
+
+    /* Pódio */
+    #podioBlock{ margin-top:18px; }
+    .podio-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; justify-items:center; align-items:end; margin-top:8px; }
+    .podio-col{ display:flex; flex-direction:column; align-items:center; }
+    .podio-wrap{ height:160px; width:110px; display:flex; align-items:flex-end; justify-content:center; }
+    .podio-bar{ width:86px; border-radius:12px; display:flex; align-items:flex-end; justify-content:center; box-shadow:0 10px 28px rgba(0,0,0,.3); }
+    .podio-bar span{ font-weight:800; margin-bottom:8px; color:#111 }
+    .podio-list{ font-size:.95rem; text-align:center; opacity:.95; max-width:220px; }
+
+    /* Lobby */
+    .lobby{ display:grid; gap:14px; justify-items:center; margin-top:8px; }
+    .avatar-grid{
+      display:grid; gap:8px; grid-template-columns:repeat(6, 42px);
+      padding:10px; background:rgba(255,255,255,.08); border:1px solid var(--glass-border); border-radius:12px;
+      max-width:min(360px, 92vw);
     }
-
-    /* Respeitar “reduzir movimentos” do usuário */
-    @media (prefers-reduced-motion: reduce){
-      *{ animation: none !important; transition: none !important; }
+    .avatar{
+      width:42px; height:42px; border-radius:10px; background:#fff; color:#111; display:flex; align-items:center; justify-content:center;
+      cursor:pointer; border:2px solid transparent; transition:.2s transform, .2s border-color;
+      font-size:22px;
     }
+    .avatar:hover{ transform:translateY(-2px) }
+    .avatar.selected{ border-color:#22d3ee; }
+    .input{ width:min(420px, 92vw); padding:12px 14px; border-radius:12px; border:1px solid var(--glass-border); font-size:16px; outline:none; }
 
+    .hidden{ display:none!important; }
+    .section-title{ font-size:var(--fs-lg); margin:0 0 8px; }
+    .muted{ opacity:.9 }
+
+    @media (max-width:768px){
+      .container{ margin-top:76px }
+      .options{ grid-template-columns:1fr; }
+      .podio-grid{ grid-template-columns:1fr; }
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="logo-container">
-      <img src="https://imgur.com/c5XQ7TW.png" class="logo-eac" alt="Logo EAC">
-      <h1 style="font-size: 1.5rem; margin: 0;">Quiz EAC</h1>
+  <!-- HEADER -->
+  <header class="header">
+    <div class="logo-row">
+      <img class="logo-eac" src="https://imgur.com/c5XQ7TW.png" alt="EAC">
+      <div class="brand">EAC Quiz</div>
     </div>
-    <div class="score-display">
-      <span class="score-icon">🏆</span>
-      <span id="score">0</span>
-    </div>
-  </div>
+    <div class="score-chip"><span id="avatarChip" style="font-size:18px">😎</span><span id="score">0</span></div>
+  </header>
 
-  <div id="tela">
-    <div class="timer-container" id="timer" style="display: none;">
-      <span id="timeLeft">30</span>s
-    </div>
+  <main class="container">
+    <!-- HOME -->
+    <section id="home" class="hero">
+      <img src="https://imgur.com/c5XQ7TW.png" alt="Logo EAC" style="width:96px; height:96px; border-radius:16px; object-fit:cover;"/>
+      <h1>EAC Quiz</h1>
+      <p class="sub">Desafie seus amigos e mostre quem manda bem! 💡✨</p>
 
-    <div class="progress-container" style="display: none;" id="progressContainer">
-      <div class="progress-bar">
-        <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+      <div class="hero-cta">
+        <button class="btn primary" onclick="showLobby()">⚡ Começar agora!</button>
       </div>
-      <div class="progress-text">
-        Pergunta <span id="currentQuestion">1</span> de <span id="totalQuestions">10</span>
-      </div>
-    </div>
 
-    <div id="content">
-      <div class="loading"></div>
-      <p>Carregando quiz...</p>
-    </div>
-  </div>
+      <div class="stats">
+        <div class="stat"><b id="statPerguntas">—</b><small>Perguntas</small></div>
+        <div class="stat"><b id="statTempo">15s</b><small>por questão</small></div>
+        <div class="stat"><b id="statPontos">1000+</b><small>pontos máx.</small></div>
+      </div>
+    </section>
+
+    <!-- CARD PRINCIPAL -->
+    <section id="tela" class="hidden">
+      <div id="timer" class="timer hidden"><span id="timeLeft">30</span>s</div>
+
+      <div id="progressContainer" class="progress hidden">
+        <div class="bar"><div id="progressFill" class="fill"></div></div>
+        <small>Pergunta <span id="currentQuestion">1</span> de <span id="totalQuestions">10</span></small>
+      </div>
+
+      <div id="content"></div>
+    </section>
+  </main>
+
 <script>
-  // Variáveis globais para gamificação
-  let score = 0;
-  let streak = 0;
-  let currentQuestionIndex = 0;
-  let totalQuestions = 0;
-  let timeLeft = 30;
-  let timerInterval;
-  let questions = []; // Variável de perguntas do Apps Script
+  // ===== Estado global
+  let score=0, streak=0, currentQuestionIndex=0, totalQuestions=0;
+  let timeLeft=30, timerInterval=null;
+  let NOME=null, AVATAR='😎', QUIZ=null, PERGS=[];
+  let quizzesCache=[]; let SINGLE_QUIZ_ID=null;
+  let LAST_RESULT = null; // {acertos, total} do jogador ao finalizar
 
-  // Elementos DOM
-  const ui = document.getElementById('tela');
+
+  const AVATARS = ['😎','🤩','😇','🧠','⚡','🔥','🎯','🐱','🐶','🐼','🐸','🐵','🦊','🦁','🐯','🐨','🦄','🐲'];
+
+  // ===== Elementos
+  const $home = document.getElementById('home');
+  const $card = document.getElementById('tela');
+  const contentElement = document.getElementById('content');
   const scoreElement = document.getElementById('score');
   const timerElement = document.getElementById('timer');
   const timeLeftElement = document.getElementById('timeLeft');
@@ -736,223 +226,126 @@
   const progressFill = document.getElementById('progressFill');
   const currentQuestionElement = document.getElementById('currentQuestion');
   const totalQuestionsElement = document.getElementById('totalQuestions');
-  const contentElement = document.getElementById('content');
 
-  // Variáveis globais do Apps Script
-  let NOME, QUIZ, PERGS = [];
+  const show = el => el.classList.remove('hidden');
+  const hide = el => el.classList.add('hidden');
 
-  // Funções de gamificação
-  function updateScore(points) {
-    score += points;
-    scoreElement.textContent = score;
-    scoreElement.parentElement.classList.add('celebration');
-    setTimeout(() => {
-      scoreElement.parentElement.classList.remove('celebration');
-    }, 600);
-  }
+  // ===== HOME -> LOBBY
+  function showLobby(){
+    hide($home);
+    show($card);
 
-  function updateProgress() {
-    const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100;
-    progressFill.style.width = progress + '%';
-    currentQuestionElement.textContent = currentQuestionIndex + 1;
-    totalQuestionsElement.textContent = totalQuestions;
-  }
+    const ensureQuizzes = (cb)=>{
+      if (quizzesCache && quizzesCache.length) return cb();
+      google.script.run
+        .withSuccessHandler(qs=>{ quizzesCache = qs||[]; cb(); })
+        .withFailureHandler(()=>{ quizzesCache = []; cb(); })
+        .getQuizzes();
+    };
 
-  function startTimer() {
-    timeLeft = 30; // Resetar tempo
-    timeLeftElement.textContent = timeLeft;
-    timerElement.style.display = 'block';
-    timerElement.classList.remove('timer-urgent');
+    ensureQuizzes(()=>{
+      SINGLE_QUIZ_ID = quizzesCache.length === 1 ? quizzesCache[0].id : null;
+      const hasMultiple = quizzesCache.length > 1;
 
-    clearInterval(timerInterval); // Limpar qualquer timer anterior
-    timerInterval = setInterval(() => {
-      timeLeft--;
-      timeLeftElement.textContent = timeLeft;
+      contentElement.innerHTML = `
+        <h2 class="section-title">Escolha seu apelido e avatar</h2>
+        <p class="muted">Seu nome aparecerá no ranking. O avatar é só para estilo 😎</p>
 
-      if (timeLeft <= 10) {
-        timerElement.classList.add('timer-urgent');
+        <div class="lobby">
+          <input id="nomeInput" class="input" placeholder="Digite seu nome..." maxlength="40" />
+          <div class="avatar-grid" id="avatarGrid">
+            ${AVATARS.map((a,i)=>`<button class="avatar ${i===0?'selected':''}" data-v="${a}" onclick="selectAvatar(this)">${a}</button>`).join('')}
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:8px;">
+            ${hasMultiple ? `<button class="btn" onclick="loadQuizzesList()">📚 Escolher quiz</button>` : ``}
+            <button class="btn primary" onclick="confirmLobby()">🚀 Continuar</button>
+            <button class="btn" onclick="goHome()">🏠 Início</button>
+          </div>
+        </div>
+      `;
+
+      const saved = localStorage.getItem('EAO_LOBBY');
+      if (saved){
+        try{
+          const o=JSON.parse(saved);
+          document.getElementById('nomeInput').value = o.nome || '';
+          AVATAR = o.avatar || AVATAR;
+          document.getElementById('avatarChip').textContent = AVATAR;
+          [...document.querySelectorAll('.avatar')].forEach(btn=>{
+            btn.classList.toggle('selected', btn.dataset.v===AVATAR);
+          });
+        }catch(_){}
       }
-
-      if (timeLeft <= 0) {
-        clearInterval(timerInterval);
-        handleTimeUp();
-      }
-    }, 1000);
+    });
   }
 
-  function stopTimer() {
-    clearInterval(timerInterval);
-    timerElement.style.display = 'none';
+  function selectAvatar(btn){
+    AVATAR = btn.dataset.v;
+    document.querySelectorAll('.avatar').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
   }
 
-  function handleTimeUp() {
-    // Lógica para quando o tempo acaba - considera resposta incorreta
-    showFeedback(false, "Tempo esgotado!");
-    const p = PERGS[currentQuestionIndex];
-    // Chama choose com um índice de resposta incorreta (-1 ou null)
-    choose(null, p.id, true); // O 'true' indica que foi por tempo esgotado
-  }
+  function confirmLobby(){
+    const nome = (document.getElementById('nomeInput').value || '').trim();
+    if (!nome){ alert('Digite um nome válido'); return; }
+    NOME = nome;
+    localStorage.setItem('EAO_LOBBY', JSON.stringify({nome:NOME, avatar:AVATAR}));
+    document.getElementById('avatarChip').textContent = AVATAR;
 
-  function createConfetti() {
-    for (let i = 0; i < 50; i++) {
-      const confetti = document.createElement('div');
-      confetti.className = 'confetti';
-      confetti.style.left = Math.random() * 100 + 'vw';
-      confetti.style.animationDelay = Math.random() * 3 + 's';
-      confetti.style.animationDuration = (Math.random() * 3 + 2) + 's';
-      document.body.appendChild(confetti);
-
-      setTimeout(() => {
-        confetti.remove();
-      }, 5000);
-    }
-  }
-
-  function showFeedback(isCorrect, message) {
-    const feedbackContainer = document.createElement('div');
-    feedbackContainer.className = `feedback-container ${isCorrect ? 'feedback-correct' : 'feedback-incorrect'}`;
-    feedbackContainer.innerHTML = `
-      <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
-        <span style="font-size: 24px;">${isCorrect ? '✅' : '❌'}</span>
-        <span>${message}</span>
-      </div>
-    `;
-
-    contentElement.appendChild(feedbackContainer);
-
-    if (isCorrect) {
-      createConfetti();
-      updateScore(100 + (streak * 10));
-      streak++;
-
-      if (streak >= 3) {
-        showAchievement(`🔥 ${streak} acertos seguidos!`);
-      }
+    if (SINGLE_QUIZ_ID){
+      startQuiz(SINGLE_QUIZ_ID);
     } else {
-      streak = 0;
-    }
-
-    setTimeout(() => {
-      feedbackContainer.remove();
-    }, 3000);
-  }
-
-  function showAchievement(message) {
-    const badge = document.createElement('div');
-    badge.className = 'achievement-badge';
-    badge.textContent = message;
-    document.body.appendChild(badge);
-
-    setTimeout(() => {
-      badge.remove();
-    }, 3000);
-  }
-
-  function shareResults() {
-    const text = `Acabei de fazer o Quiz EAC e consegui ${score} pontos! 🎉`;
-    if (navigator.share) {
-      navigator.share({
-        title: 'Quiz EAC',
-        text: text,
-        url: window.location.href
-      });
-    } else {
-      // Fallback para copiar para clipboard
-      navigator.clipboard.writeText(text + ' ' + window.location.href);
-      showAchievement('Link copiado! 📋');
+      loadQuizzesList();
     }
   }
 
-  // Funções de interação com Google Apps Script
-  document.addEventListener('DOMContentLoaded', function() {
-      showWelcomeScreen();
-  });
-
-  function showWelcomeScreen() {
-    contentElement.innerHTML = `
-      <h2>Bem-vindo ao Quiz EAC Gamificado! 🎮</h2>
-      <p style="font-size: 1.1rem; margin-bottom: 30px; opacity: 0.9;">
-        Teste seus conhecimentos e ganhe pontos! Responda rapidamente para ganhar bônus.
-      </p>
-      <button class="quiz-button" onclick="loadQuizzesList()">
-        🚀 Começar Quiz
-      </button>
-    `;
-    // Esconder elementos do quiz na tela de boas-vindas
-    timerElement.style.display = 'none';
-    progressContainer.style.display = 'none';
-    scoreElement.textContent = '0';
+  function goHome(){
+    hide($card); show($home); scoreElement.textContent='0';
   }
 
-  function loadQuizzesList() {
-    contentElement.innerHTML = `
-      <div class="loading"></div>
-      <p>Carregando lista de quizzes...</p>
-    `;
-
+  // ===== Dados
+  function loadQuizzesList(){
+    contentElement.innerHTML = `<div class="muted">Carregando lista...</div>`;
+    show($card);
     google.script.run
       .withSuccessHandler(showQuizzes)
       .withFailureHandler(showError)
       .getQuizzes();
   }
 
-  // ====== SUBSTITUÍDA / ATUALIZADA ======
-  function showQuizzes(quizzes) {
-    if (!quizzes || quizzes.length === 0) {
+  function showQuizzes(quizzes){
+    quizzesCache = quizzes || [];
+    if (!quizzesCache.length){
       contentElement.innerHTML = `
-        <div class="error-message">
-          <h3>⚠️ Nenhum quiz encontrado</h3>
-          <p>Verifique se existem dados na aba 'quiz_perguntas' da planilha.</p>
-          <button class="quiz-button" onclick="reiniciar()">🔙 Voltar</button>
-        </div>
+        <div class="muted">Nenhum quiz encontrado.</div>
+        <div style="margin-top:10px;"><button class="btn" onclick="goHome()">Voltar</button></div>
       `;
       return;
     }
-
     contentElement.innerHTML = `
-      <h2>Selecione um quiz</h2>
-      <div class="quiz-grid" style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
-        ${quizzes.map(q => {
-          const nomeFormatado = q.nome.replace(/^quiz_/, '').replace(/_/g, ' ').toUpperCase();
+      <h2 class="section-title">Selecione um quiz</h2>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-top:10px;">
+        ${quizzesCache.map(q=>{
+          const nome = q.nome.replace(/^quiz_/,'').replace(/_/g,' ').toUpperCase();
           return `
-            <div style="display:flex; gap:8px; justify-content:center; align-items:center;">
-              <button class="quiz-button" onclick="startQuiz('${q.id}')">▶️ Jogar — ${nomeFormatado}</button>
-              <button class="quiz-button" style="background:#111827;color:#fff" onclick="showRanking('${q.id}','${nomeFormatado}')">📊 Resultados</button>
+            <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+              <button class="btn primary" onclick="startQuiz('${q.id}')">▶️ Jogar — ${nome}</button>
+              <button class="btn dark" onclick="showRanking('${q.id}','${nome}')">📊 Resultados</button>
             </div>
           `;
         }).join('')}
       </div>
-      <div style="margin-top:18px;">
-        <button class="quiz-button" onclick="showWelcomeScreen()">🔙 Início</button>
-      </div>
+      <div style="margin-top:14px;"><button class="btn" onclick="goHome()">Início</button></div>
     `;
   }
 
-  function startQuiz(q) {
-    QUIZ = q;
-    do {
-      NOME = prompt('Digite seu nome para participar do quiz:');
-      if (NOME === null) { // Usuário cancelou
-        showWelcomeScreen(); // Volta para a tela de boas-vindas
-        return;
-      }
-      NOME = NOME.trim();
-      if (!NOME) alert('Por favor, digite um nome válido!');
-    } while (!NOME);
+  function startQuiz(quizId){
+    if (!NOME){ alert('Defina seu nome no lobby antes de jogar'); return; }
+    QUIZ = quizId;
 
-    contentElement.innerHTML = `
-      <div class="loading"></div>
-      <p>Carregando perguntas do quiz...</p>
-    `;
-
-    // Resetar variáveis de gamificação ao iniciar um novo quiz
-    score = 0;
-    streak = 0;
-    currentQuestionIndex = 0;
-    scoreElement.textContent = '0';
-    progressFill.style.width = '0%';
-    timerElement.style.display = 'none';
-    progressContainer.style.display = 'none';
+    score = 0; streak=0; currentQuestionIndex=0; scoreElement.textContent='0';
+    progressFill.style.width='0%';
+    contentElement.innerHTML = `<div class="muted">Carregando perguntas...</div>`;
 
     google.script.run
       .withSuccessHandler(loadPerguntas)
@@ -960,626 +353,379 @@
       .getPerguntas(QUIZ);
   }
 
-  function loadPerguntas(pergs) {
-    PERGS = pergs;
-    currentQuestionIndex = 0;
+  function loadPerguntas(pergs){
+    PERGS = pergs || [];
     totalQuestions = PERGS.length;
-
-    if (!PERGS || PERGS.length === 0) {
-      contentElement.innerHTML = `
-        <div class="error-message">
-          <h3>⚠️ Nenhuma pergunta encontrada</h3>
-          <p>Este quiz não possui perguntas cadastradas.</p>
-          <button class="quiz-button" onclick="reiniciar()">🔙 Voltar aos Quizzes</button>
-        </div>
-      `;
+    if (!totalQuestions){
+      contentElement.innerHTML = `<div class="muted">Quiz sem perguntas.</div><div style="margin-top:10px"><button class="btn" onclick="loadQuizzesList()">Voltar</button></div>`;
       return;
     }
-
-    // Mostrar barra de progresso e timer
-    progressContainer.style.display = 'block';
-    timerElement.style.display = 'block';
-
-    try {
-      ask(); // inicia a primeira pergunta
-    } catch (err) {
-      contentElement.innerHTML = `
-        <div class="error-message">
-          <h3>❌ Erro ao montar pergunta</h3>
-          <p>${err.message}</p>
-          <button class="quiz-button" onclick="reiniciar()">🔙 Tentar novamente</button>
-        </div>
-      `;
-    }
+    show(progressContainer); show(timerElement);
+    ask();
   }
 
-  function ask() {
-    if (!PERGS || !Array.isArray(PERGS)) return;
+  // ===== Timer / progresso
+  function updateProgress(){
+    const progress = ((currentQuestionIndex+1)/totalQuestions)*100;
+    progressFill.style.width = progress+'%';
+    currentQuestionElement.textContent = currentQuestionIndex+1;
+    totalQuestionsElement.textContent = totalQuestions;
+  }
+  function startTimer(){
+    timeLeft=30; timeLeftElement.textContent=timeLeft;
+    timerElement.classList.remove('urgent');
+    clearInterval(timerInterval);
+    timerInterval = setInterval(()=>{
+      timeLeft--; timeLeftElement.textContent=timeLeft;
+      if (timeLeft<=10) timerElement.classList.add('urgent');
+      if (timeLeft<=0){ clearInterval(timerInterval); handleTimeUp(); }
+    },1000);
+  }
+  function stopTimer(){ clearInterval(timerInterval); }
 
-    // Se já respondeu tudo, finaliza
-    if (currentQuestionIndex >= PERGS.length) {
-      finish();
-      return;
-    }
-
+  // ===== Quiz flow
+  function ask(){
+    if (currentQuestionIndex>=PERGS.length){ finish(); return; }
     const p = PERGS[currentQuestionIndex];
-
-    // Validação da estrutura da pergunta
-    if (!p || typeof p.pergunta !== "string" || !Array.isArray(p.opcoes) || p.opcoes.length !== 4 || typeof p.correta !== "number") {
-      contentElement.innerHTML = `
-        <div class="error-message">
-          <h3>❌ Erro ao exibir a pergunta</h3>
-          <p>A pergunta atual está mal formatada ou incompleta.</p>
-          <pre style="text-align: left; font-size: 12px;">${JSON.stringify(p, null, 2)}</pre>
-          <button class="quiz-button" onclick="reiniciar()">🔁 Tentar outro quiz</button>
-        </div>
-      `;
+    if (!p || !Array.isArray(p.opcoes) || typeof p.correta!=='number'){
+      contentElement.innerHTML = `<div class="muted">Pergunta inválida.</div><div style="margin-top:10px"><button class="btn" onclick="loadQuizzesList()">Voltar</button></div>`;
       return;
     }
-
-    // Escapador de caracteres HTML
-    const escapeHTML = (str) => String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-
+    const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     updateProgress();
-
-    const colors = ['red', 'blue', 'yellow', 'green'];
-
-    const htmlPergunta = `
-      <h2>${escapeHTML(p.pergunta)}</h2>
+    contentElement.innerHTML = `
+      <h2 class="section-title" style="text-align:center">${esc(p.pergunta)}</h2>
       <div class="options">
-        ${p.opcoes.map((opc, i) => `
-          <button class="option-button option-${colors[i]}" 
-                  data-correct="${i === p.correta}" 
-                  onclick="choose(${i}, '${p.id}', false)">
-            <span class="option-icon"></span>
-            <span>${escapeHTML(opc)}</span>
+        ${p.opcoes.map((t,i)=>`
+          <button class="option ${['red','blue','yellow','green'][i]}" data-correct="${i===p.correta}" onclick="choose(${i},'${p.id}',false)">
+            <span>${esc(t)}</span>
           </button>
         `).join('')}
       </div>
     `;
-
-    contentElement.innerHTML = htmlPergunta;
-
-    // Garante exibição mesmo se algum CSS quebrar
-    contentElement.style.display = 'block';
-    contentElement.style.visibility = 'visible';
-    contentElement.style.opacity = '1';
-
     startTimer();
   }
 
-  function choose(indice, idPergunta, isTimeUp = false) {
-    // Para o timer imediatamente
+  function showFeedback(ok, msg){
+    const div=document.createElement('div'); div.className=`feedback ${ok?'ok':'err'}`; div.textContent=msg;
+    contentElement.appendChild(div); setTimeout(()=>div.remove(), 1600);
+  }
+
+  function handleTimeUp(){
+    showFeedback(false,'Tempo esgotado!');
+    const p = PERGS[currentQuestionIndex];
+    choose(null, p.id, true);
+  }
+
+  function choose(indice, idPergunta, isTimeUp=false){
     stopTimer();
+    const btns=[...document.querySelectorAll('.option')];
+    btns.forEach(b=>{ b.classList.add('disabled'); b.style.pointerEvents='none'; });
 
-    const botoes = document.querySelectorAll('.option-button');
-    let isCorrect = false;
+    let isCorrect=false;
+    const indiceOk = Number.isInteger(indice) && indice>=0 && indice<btns.length;
 
-    // Desativa todos os botões
-    botoes.forEach(btn => {
-      btn.classList.add('option-disabled');
-      btn.style.pointerEvents = 'none';
-    });
-
-    // Garante índice válido (0..botoes.length-1)
-    const indiceValido = Number.isInteger(indice) && indice >= 0 && indice < botoes.length;
-
-    if (!isTimeUp && indiceValido) {
-      const botaoSelecionado = botoes[indice];
-      isCorrect = (botaoSelecionado && botaoSelecionado.dataset.correct === 'true');
-
-      // Feedback visual imediato
-      if (isCorrect) {
-        botaoSelecionado.classList.add('option-correct');
-        showFeedback(true, "Correto! 🎉");
-      } else {
-        botaoSelecionado.classList.add('option-incorrect');
-        showFeedback(false, "Incorreto! 😞");
-      }
+    if (!isTimeUp && indiceOk){
+      const b = btns[indice];
+      isCorrect = (b && b.dataset.correct==='true');
+      b.classList.add(isCorrect?'correct':'incorrect');
+      showFeedback(isCorrect,'Resposta ' + (isCorrect?'correta 🎉':'incorreta 😞'));
+      if (isCorrect){ score += 100 + (streak*10); streak++; scoreElement.textContent = score; } else { streak=0; }
     } else {
-      // Foi por tempo esgotado ou índice inválido
-      isCorrect = false;
-      if (isTimeUp) {
-        // feedback do tempo já foi mostrado em handleTimeUp()
-      } else {
-        showFeedback(false, "Resposta inválida.");
-      }
+      isCorrect=false;
     }
 
-    // Sempre destaca a alternativa correta
-    botoes.forEach(btn => {
-      if (btn.dataset.correct === 'true') {
-        btn.classList.add('option-correct');
-      }
-    });
+    btns.forEach(b=>{ if (b.dataset.correct==='true') b.classList.add('correct'); });
 
-    // Calcula tempo gasto nesta pergunta (base 30s) e envia para o Apps Script
-    // timeLeft já existe no seu código; clamp para garantir 0..30
-    const tempoGasto = Math.min(30, Math.max(0, 30 - (Number(timeLeft) || 0)));
-
-    // Se foi por tempo esgotado ou índice inválido, mandamos null
-    const indiceParaSalvar = (isTimeUp || !indiceValido) ? null : indice;
+    const tempoGasto = Math.min(30, Math.max(0, 30 - (Number(timeLeft)||0)));
+    const idxSalvar = (isTimeUp || !indiceOk) ? null : indice;
 
     google.script.run
       .withFailureHandler(showError)
-      .saveResposta(NOME, QUIZ, idPergunta, indiceParaSalvar, tempoGasto);
+      .saveResposta(NOME, QUIZ, idPergunta, idxSalvar, tempoGasto);
 
-    // Próxima pergunta após pequeno delay para o usuário ver o feedback
-    setTimeout(() => {
-      currentQuestionIndex++;
-      ask();
-    }, 3000);
+    setTimeout(()=>{ currentQuestionIndex++; ask(); }, 1500);
   }
 
+  // ===== Finalização: recalcula ranking e abre ranking
+  function finish(){
+    hide(progressContainer); hide(timerElement);
+    contentElement.innerHTML = `<div class="muted">Calculando seu resultado...</div>`;
 
-  function finish() {
-    contentElement.innerHTML = `
-      <div class="loading"></div>
-      <p>Calculando seu resultado final...</p>
-    `;
-
+    // 1) fecha tentativa e pega {acertos,total}
     google.script.run
-      .withSuccessHandler(showResultadoFinal)
+      .withSuccessHandler((res)=>{
+        LAST_RESULT = res || null; // guarda resultado do jogador
+
+        // 2) reprocessa o ranking desse quiz
+        google.script.run
+          .withSuccessHandler(()=>{
+            // 3) carrega ranking e renderiza com banner personalizado
+            google.script.run
+              .withSuccessHandler((dados)=> renderRanking(QUIZ, '', dados || [], { playerName: NOME, avatar: AVATAR, lastResult: LAST_RESULT }))
+              .withFailureHandler(showError)
+              .getRanking(QUIZ);
+          })
+          .withFailureHandler(showError)
+          .recomputarRankingQuiz(QUIZ);
+      })
       .withFailureHandler(showError)
       .finalizarQuiz(NOME, QUIZ);
   }
 
-  // ====== ATUALIZADA: agora inclui o botão "Ver Ranking do Quiz" ======
-  function showResultadoFinal(resultado) {
-    stopTimer();
-    progressContainer.style.display = 'none';
 
-    const percentage = (resultado.acertos / resultado.total) * 100;
-    let message = '';
-    let emoji = '';
-
-    if (percentage >= 90) { message = 'Excelente! Você é um expert!'; emoji = '🏆'; createConfetti(); }
-    else if (percentage >= 70) { message = 'Muito bom! Continue assim!'; emoji = '🎉'; }
-    else if (percentage >= 50) { message = 'Bom trabalho! Pode melhorar!'; emoji = '👍'; }
-    else { message = 'Precisa estudar mais!'; emoji = '📚'; }
-
-    contentElement.innerHTML = `
-      <div style="text-align:center;">
-        <div style="font-size:4rem; margin-bottom:20px;">${emoji}</div>
-        <h2>Quiz Finalizado!</h2>
-        <div style="font-size:2rem; margin:20px 0; color: var(--accent-color);">
-          ${resultado.acertos} acertos de ${resultado.total} perguntas
-        </div>
-        <div style="font-size:1.2rem; margin-bottom:30px;">${Math.round(percentage)}% de acertos</div>
-        <p style="font-size:1.1rem; margin-bottom:24px;">${message}</p>
-
-        <button class="quiz-button" onclick="reiniciar()">🔄 Jogar Novamente</button>
-        <button class="quiz-button" onclick="shareResults()" style="background: var(--success-color); color:#fff;">📱 Compartilhar Resultado</button>
-        <button class="quiz-button" onclick="showRanking('${QUIZ}')">📊 Ver Ranking do Quiz</button>
-
-        <!-- Bloco do PÓDIO -->
-        <div id="podioBlock" style="margin-top:28px;">
-          <h3 style="margin-bottom:10px;">🥇🥈🥉 Top 3 do Quiz</h3>
-          <div id="podioContent" style="min-height:120px;">
-            <div class="loading"></div>
-            <p>Carregando pódio...</p>
-          </div>
-        </div>
-      </div>
-    `;
-
-    // carrega o pódio com base no ranking atual
-    loadPodio(QUIZ);
-  }
-
-
-  function showError(error) {
-    contentElement.innerHTML = `
-      <div class="error-message">
-        <h3>Erro ao carregar dados</h3>
-        <p>${error.message || error.toString()}</p>
-        <button class="quiz-button" onclick="reiniciar()">🔙 Voltar</button>
-      </div>
-    `;
-  }
-
-  function reiniciar() {
-    // Limpa tudo e volta para a tela de boas-vindas
-    score = 0;
-    streak = 0;
-    currentQuestionIndex = 0;
-    totalQuestions = 0;
-    PERGS = [];
-    NOME = null;
-    QUIZ = null;
-    stopTimer();
-    scoreElement.textContent = '0';
-    progressFill.style.width = '0%';
-    timerElement.style.display = 'none';
-    progressContainer.style.display = 'none';
-    showWelcomeScreen();
-  }
-
-  // ====== NOVAS: ranking e atividade recente ======
-
-  // Busca ranking do quiz selecionado
-  function showRanking(quizId, nomeFormatado = '') {
-    contentElement.innerHTML = `
-      <div class="loading"></div>
-      <p>Recalculando e carregando resultados...</p>
-    `;
+  // ===== Ranking
+  function showRanking(quizId, nomeFormatado=''){
+    contentElement.innerHTML = `<div class="muted">Carregando resultados...</div>`;
+    show($card);
 
     google.script.run
-      .withSuccessHandler(() => {
-        google.script.run
-          .withSuccessHandler((dados) => renderRanking(quizId, nomeFormatado, dados))
-          .withFailureHandler(showError)
-          .getRanking(quizId);
-      })
+      .withSuccessHandler((dados)=> renderRanking(quizId, nomeFormatado, dados || [], { playerName: NOME, avatar: AVATAR, lastResult: LAST_RESULT }))
       .withFailureHandler(showError)
-      .recomputarRankingQuiz(quizId);
-  }
-
-
-  function renderRanking(quizId, nomeFormatado, ranking) {
-    const titulo = nomeFormatado || quizId;
-
-    // pódio direto do array "ranking"
-    const podioHTML = renderPodioFromRanking(ranking);
-
-    const tabelaRanking = (!ranking || ranking.length === 0) ? `
-      <p style="opacity:.9;margin:8px 0 16px;">Ainda não há registros no ranking para este quiz.</p>
-    ` : `
-      <div style="overflow:auto; margin:12px 0;">
-        <table style="width:100%; border-collapse:separate; border-spacing:0; border-radius:12px; overflow:hidden;">
-          <thead style="background:rgba(255,255,255,.15);">
-            <tr>
-              <th style="padding:10px; text-align:center;">#</th>
-              <th style="padding:10px; text-align:left;">Nome</th>
-              <th style="padding:10px; text-align:center;">Acertos</th>
-            </tr>
-          </thead>
-          <tbody style="background:rgba(255,255,255,.08);">
-            ${ranking.map((r,i) => `
-              <tr>
-                <td style="padding:10px; text-align:center; font-weight:700;">${i + 1}</td>
-                <td style="padding:10px;">${r.nome}</td>
-                <td style="padding:10px; text-align:center;">${r.pontos}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
-
-    contentElement.innerHTML = `
-      <h2>📊 Resultados — ${titulo}</h2>
-
-      <!-- Pódio do Top 3 -->
-      ${podioHTML}
-
-      <!-- Tabela completa -->
-      ${tabelaRanking}
-
-      <div style="display:flex; gap:8px; justify-content:center; margin:12px 0 24px;">
-        <button class="quiz-button" onclick="startQuiz('${quizId}')">▶️ Jogar</button>
-        <button class="quiz-button" onclick="loadQuizzesList()">🔙 Voltar</button>
-        <button class="quiz-button" onclick="showRanking('${quizId}','${nomeFormatado}')">🔁 Atualizar</button>
-      </div>
-
-      <h3 style="margin-top:6px;">🕒 Atividade recente</h3>
-      <div id="recentActivity" style="margin-top:8px;">
-        <div class="loading"></div>
-        <p>Carregando atividade...</p>
-      </div>
-    `;
-
-    // Continua carregando a "Atividade recente" async (como antes)
-    google.script.run
-      .withSuccessHandler((rows) => {
-        const host = document.getElementById('recentActivity');
-        if (!rows || !rows.length) {
-          host.innerHTML = `<p style="opacity:.9;">Sem atividade recente.</p>`;
-          return;
-        }
-        const linhas = rows.map(r => `
-          <tr>
-            <td style="padding:8px">${new Date(r.timestamp).toLocaleString()}</td>
-            <td style="padding:8px">${r.nome}</td>
-            <td style="padding:8px">${r.idPergunta}</td>
-            <td style="padding:8px">${r.status}</td>
-            <td style="padding:8px">${r.respostaDada}</td>
-            <td style="padding:8px">${r.respostaCorreta}</td>
-          </tr>
-        `).join('');
-        host.innerHTML = `
-          <div style="overflow:auto;">
-            <table style="width:100%;border-collapse:collapse;">
-              <thead><tr>
-                <th>Quando</th><th>Nome</th><th>Pergunta</th><th>Status</th><th>Dada</th><th>Correta</th>
-              </tr></thead>
-              <tbody>${linhas}</tbody>
-            </table>
-          </div>
-        `;
-      })
-      .withFailureHandler(() => {
-        const host = document.getElementById('recentActivity');
-        host.innerHTML = `<p class="error-message">Falha ao carregar atividade.</p>`;
-      })
-      .getUltimosResultados(quizId, 30);
-  }
-// ===== Helpers robustos (no escopo global) =====
-window.showDevError = function (where, err) {
-  console.error(`[${where}]`, err);
-  const host = document.getElementById('content') || contentElement;
-  if (host) {
-    host.innerHTML = `
-      <div class="error-message">
-        <h3>Erro ao montar a tela</h3>
-        <p style="word-break:break-word;">${(err && err.message) ? err.message : String(err)}</p>
-        <button class="quiz-button" onclick="loadQuizzesList()">🔙 Voltar</button>
-      </div>
-    `;
-  }
-};
-
-window.computePlacements = function (items) {
-  if (!Array.isArray(items)) return [];
-  const places = [];
-  let last = null;
-  let lastPlace = 0;
-  for (let i = 0; i < items.length; i++) {
-    const cur = items[i] || {};
-    const isTie = last
-      && Number(cur.pontos) === Number(last.pontos)
-      && (
-        (cur.tempo == null && last.tempo == null) ||
-        (typeof cur.tempo === 'number' && typeof last.tempo === 'number' && cur.tempo === last.tempo)
-      );
-    lastPlace = isTie ? lastPlace : (i + 1);
-    places.push(lastPlace);
-    last = cur;
-  }
-  return places;
-};
-
-function renderPodioFromRanking(ranking) {
-  try {
-    if (!Array.isArray(ranking) || ranking.length === 0) {
-      return `
-        <div id="podioBlock" style="margin-top:24px;">
-          <h3 style="margin-bottom:10px;">🥇🥈🥉 Top 3 do Quiz</h3>
-          <p style="opacity:.85;">Ainda não há participantes no ranking.</p>
-        </div>
-      `;
-    }
-
-    // usa a função computePlacements(ranking) que já criamos
-    const places = computePlacements(ranking);
-    const distinctPlaces = [...new Set(places)].slice(0, 3); // 1º, 2º, 3º
-    const buckets = distinctPlaces.map(p => ranking.filter((_, i) => places[i] === p));
-
-    // estilos por lugar
-    const styleByPlace = (place) => {
-      return {
-        barH: place === 1 ? 140 : place === 2 ? 110 : 90,
-        color: place === 1 ? '#f0c419' : place === 2 ? '#c0c6cf' : '#d59b6a',
-        label: place === 1 ? '🥇 1º' : place === 2 ? '🥈 2º' : '🥉 3º'
-      };
-    };
-
-    const makeColumn = (place, group) => {
-      const s = styleByPlace(place);
-
-      if (!group || !group.length) {
-        return `
-          <div class="podio-col">
-            <div class="podio-wrap">
-              <div class="podio-bar" style="height:${s.barH}px; background:rgba(255,255,255,.10);">
-                <span style="opacity:.6;">—</span>
-              </div>
-            </div>
-            <div style="margin-top:8px; font-weight:800; text-align:center;">${s.label}</div>
-            <div class="podio-list" style="opacity:.6;">—</div>
-          </div>
-        `;
-      }
-
-      const itens = group.map(item => {
-        const nome = (item?.nome || '').toString();
-        const nomeCurto = nome.length > 22 ? nome.slice(0, 20) + '…' : nome;
-        const tempoTxt = typeof item.tempo === 'number' ? ` · ${item.tempo.toFixed(1)}s` : '';
-        const pontos = typeof item.pontos === 'number' ? item.pontos : (Number(item.pontos) || 0);
-        return `
-          <div style="display:flex; align-items:center; gap:6px; justify-content:center; margin:4px 0;">
-            <span style="font-weight:700;">${pontos} pts</span>
-            <span style="opacity:.65;">—</span>
-            <span title="${nome}">${nomeCurto}${tempoTxt}</span>
-          </div>
-        `;
-      }).join('');
-
-      return `
-        <div class="podio-col">
-          <div class="podio-wrap">
-            <div class="podio-bar" style="height:${s.barH}px; background:${s.color};">
-              <span>${group[0].pontos}</span>
-            </div>
-          </div>
-          <div style="margin-top:8px; font-weight:800; text-align:center;">${s.label}</div>
-          <div class="podio-list">
-            ${itens}
-          </div>
-        </div>
-      `;
-    };
-
-    // ordem visual: 2º | 1º | 3º (se existirem)
-    const have1 = buckets[0]?.length;
-    const have2 = buckets[1]?.length;
-    const have3 = buckets[2]?.length;
-
-    const col2 = have2 ? makeColumn(2, buckets[1]) : makeColumn(2, []);
-    const col1 = have1 ? makeColumn(1, buckets[0]) : makeColumn(1, []);
-    const col3 = have3 ? makeColumn(3, buckets[2]) : makeColumn(3, []);
-
-    return `
-      <div id="podioBlock" style="margin-top:24px;">
-        <h3 style="margin-bottom:12px;">🥇🥈🥉 Top 3 do Quiz</h3>
-        <div class="podio-grid">
-          ${col2}
-          ${col1}
-          ${col3}
-        </div>
-      </div>
-    `;
-  } catch (e) {
-    console.error('renderPodioFromRanking error:', e);
-    return `
-      <div id="podioBlock" style="margin-top:24px;">
-        <h3 style="margin-bottom:10px;">🥇🥈🥉 Top 3 do Quiz</h3>
-        <p class="error-message">Falha ao montar o pódio.</p>
-      </div>
-    `;
-  }
-}
-
-
-
-// ===== Fluxo principal do Ranking =====
-window.showRanking = function (quizId, nomeFormatado = '') {
-  try {
-    contentElement.innerHTML = `
-      <div class="loading"></div>
-      <p>Carregando resultados...</p>
-    `;
-
-    google.script.run
-      .withSuccessHandler((dados) => {
-        try {
-          // normaliza retorno
-          const ranking = Array.isArray(dados) ? dados : [];
-          renderRanking(quizId, nomeFormatado, ranking);
-        } catch (e) {
-          showDevError('showRanking/successHandler', e);
-        }
-      })
-      .withFailureHandler((err) => {
-        showDevError('showRanking/failureHandler', err);
-      })
       .getRanking(quizId);
-  } catch (e) {
-    showDevError('showRanking', e);
   }
-};
 
-window.renderRanking = function (quizId, nomeFormatado, ranking) {
-  try {
+
+  function renderRanking(quizId, nomeFormatado, ranking, opts = {}) {
+    const { playerName = '', avatar = '😎', lastResult = null } = opts;
     const titulo = nomeFormatado || quizId;
 
+    // Banner personalizado (se tivermos playerName ou lastResult)
+    const playerBannerHTML = renderPlayerBanner(ranking, { playerName, avatar, lastResult });
+
     const podioHTML = renderPodioFromRanking(ranking);
-
     const hdrTempo = Array.isArray(ranking) && ranking.some(r => typeof r.tempo === 'number');
-    const headerExtra = hdrTempo ? `<th style="padding:10px; text-align:center;">Tempo médio (s)</th>` : '';
+    const headerExtra = hdrTempo ? `<th style="text-align:center;">Tempo médio (s)</th>` : '';
 
-    const places = computePlacements(ranking || []);
-
-    const linhas = (!ranking || ranking.length === 0) ? '' : ranking.map((r,i) => `
+    const places = computePlacements(ranking||[]);
+    const linhas = (!ranking||!ranking.length) ? '' : ranking.map((r,i)=>`
       <tr>
-        <td style="padding:10px; text-align:center; font-weight:700;">${places[i]}</td>
-        <td style="padding:10px;">${r.nome}</td>
-        <td style="padding:10px; text-align:center;">${r.pontos}</td>
-        ${hdrTempo ? `<td style="padding:10px; text-align:center;">${(typeof r.tempo === 'number') ? r.tempo.toFixed(1) : '—'}</td>` : ''}
+        <td style="text-align:center; font-weight:800">${places[i]}</td>
+        <td>${r.nome}</td>
+        <td style="text-align:center">${r.pontos}</td>
+        ${hdrTempo?`<td style="text-align:center">${typeof r.tempo==='number'?r.tempo.toFixed(1):'—'}</td>`:''}
       </tr>
     `).join('');
 
-    const tabelaRanking = (!ranking || ranking.length === 0) ? `
-      <p style="opacity:.9;margin:8px 0 16px;">Ainda não há registros no ranking para este quiz.</p>
-    ` : `
-      <div style="overflow:auto; margin:12px 0;">
-        <table style="width:100%; border-collapse:separate; border-spacing:0; border-radius:12px; overflow:hidden;">
-          <thead style="background:rgba(255,255,255,.15);">
-            <tr>
-              <th style="padding:10px; text-align:center;">#</th>
-              <th style="padding:10px; text-align:left;">Nome</th>
-              <th style="padding:10px; text-align:center;">Acertos</th>
-              ${headerExtra}
-            </tr>
-          </thead>
-          <tbody style="background:rgba(255,255,255,.08);">
-            ${linhas}
-          </tbody>
+    const tabela = (!ranking||!ranking.length) ? `<p class="muted">Sem registros ainda.</p>` : `
+      <div class="table-wrap" style="margin-top:10px">
+        <table>
+          <thead><tr>
+            <th style="text-align:center">#</th>
+            <th>Nome</th>
+            <th style="text-align:center">Acertos</th>
+            ${headerExtra}
+          </tr></thead>
+          <tbody>${linhas}</tbody>
         </table>
       </div>
     `;
 
     contentElement.innerHTML = `
-      <h2>📊 Resultados — ${titulo}</h2>
+      <h2 class="section-title">📊 Resultados — ${titulo}</h2>
 
+      ${playerBannerHTML}      <!-- 👈 banner do jogador -->
       ${podioHTML}
+      ${tabela}
 
-      ${tabelaRanking}
-
-      <div style="display:flex; gap:8px; justify-content:center; margin:12px 0 24px;">
-        <button class="quiz-button" onclick="startQuiz('${quizId}')">▶️ Jogar</button>
-        <button class="quiz-button" onclick="loadQuizzesList()">🔙 Voltar</button>
-        <button class="quiz-button" onclick="showRanking('${quizId}','${nomeFormatado}')">🔁 Atualizar</button>
+      <div style="display:flex; gap:10px; justify-content:center; margin:14px 0 18px; flex-wrap:wrap">
+        <button class="btn primary" onclick="startQuiz('${quizId}')">▶️ Jogar</button>
+        <button class="btn" onclick="goHome()">🔙 Início</button>
+        <button class="btn" onclick="showRanking('${quizId}','${nomeFormatado}')">🔁 Atualizar</button>
       </div>
 
-      <h3 style="margin-top:6px;">🕒 Atividade recente</h3>
-      <div id="recentActivity" style="margin-top:8px;">
-        <div class="loading"></div>
-        <p>Carregando atividade...</p>
-      </div>
+      <h3 class="section-title" style="font-size:1.1rem">🕒 Atividade recente</h3>
+      <div id="recentActivity" class="muted">Carregando…</div>
     `;
 
-    // carrega atividade DEPOIS de pintar ranking
-    const host = document.getElementById('recentActivity');
-    if (host) {
-      setTimeout(() => {
-        google.script.run
-          .withSuccessHandler((rows) => {
-            try {
-              if (!rows || !rows.length) {
-                host.innerHTML = `<p style="opacity:.9;">Sem atividade recente.</p>`;
-                return;
-              }
-              const linhas = rows.map(r => `
-                <tr>
-                  <td style="padding:8px">${new Date(r.timestamp).toLocaleString()}</td>
-                  <td style="padding:8px">${r.nome}</td>
-                  <td style="padding:8px">${r.idPergunta}</td>
-                  <td style="padding:8px">${r.status}</td>
-                  <td style="padding:8px">${r.respostaDada}</td>
-                  <td style="padding:8px">${r.respostaCorreta}</td>
-                </tr>
-              `).join('');
-              host.innerHTML = `
-                <div style="overflow:auto;">
-                  <table style="width:100%;border-collapse:collapse;">
-                    <thead><tr>
-                      <th>Quando</th><th>Nome</th><th>Pergunta</th><th>Status</th><th>Dada</th><th>Correta</th>
-                    </tr></thead>
-                    <tbody>${linhas}</tbody>
-                  </table>
-                </div>
-              `;
-            } catch (e) {
-              showDevError('renderRanking/successHandler getUltimosResultados', e);
-            }
-          })
-          .withFailureHandler((err) => {
-            host.innerHTML = `<p class="error-message">Falha ao carregar atividade.</p>`;
-            console.error('getUltimosResultados failure', err);
-          })
-          .getUltimosResultados(quizId, 30);
-      }, 200);
-    }
-  } catch (e) {
-    showDevError('renderRanking', e);
+    // ... mantém o restante da função (carregar atividade recente) igual
+    setTimeout(()=>{
+      google.script.run
+        .withSuccessHandler(rows=>{
+          const host=document.getElementById('recentActivity');
+          if (!rows||!rows.length){ host.textContent='Sem atividade recente.'; return; }
+          const linhas = rows.map(r=>`
+            <tr>
+              <td style="padding:8px">${new Date(r.timestamp).toLocaleString()}</td>
+              <td style="padding:8px">${r.nome}</td>
+              <td style="padding:8px; text-align:center">${r.idPergunta}</td>
+              <td style="padding:8px">${r.status}</td>
+              <td style="padding:8px">${r.respostaDada}</td>
+              <td style="padding:8px">${r.respostaCorreta}</td>
+            </tr>
+          `).join('');
+          host.innerHTML = `
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Quando</th><th>Nome</th><th>Pergunta</th><th>Status</th><th>Dada</th><th>Correta</th>
+                </tr></thead>
+                <tbody>${linhas}</tbody>
+              </table>
+            </div>
+          `;
+        })
+        .withFailureHandler(()=>{
+          document.getElementById('recentActivity').innerHTML = `<span class="muted">Falha ao carregar.</span>`;
+        })
+        .getUltimosResultados(quizId, 30);
+    }, 200);
   }
-};
 
-</script>  
+
+  // ===== Helpers de ranking/pódio
+  function computePlacements(items){
+    if (!Array.isArray(items)) return [];
+    const places=[]; let last=null, lastPlace=0;
+    for (let i=0;i<items.length;i++){
+      const cur=items[i]||{};
+      const tie = last
+        && Number(cur.pontos)===Number(last.pontos)
+        && ( (cur.tempo==null && last.tempo==null) || (typeof cur.tempo==='number'&&typeof last.tempo==='number'&&cur.tempo===last.tempo) );
+      lastPlace = tie ? lastPlace : (i+1);
+      places.push(lastPlace); last=cur;
+    }
+    return places;
+  }
+
+  function renderPodioFromRanking(ranking){
+    if (!Array.isArray(ranking)||!ranking.length){
+      return `<div id="podioBlock"><p class="muted">Ainda não há participantes.</p></div>`;
+    }
+    const places = computePlacements(ranking);
+    const distinct = [...new Set(places)].slice(0,3);
+    const buckets = distinct.map(p => ranking.filter((_,i)=>places[i]===p));
+
+    const style = (place)=>({
+      h: place===1?140:place===2?110:90,
+      c: place===1?'#f0c419':place===2?'#c0c6cf':'#d59b6a',
+      label: place===1?'🥇 1º':place===2?'🥈 2º':'🥉 3º'
+    });
+
+    const col = (place, group)=>{
+      const s=style(place);
+      if (!group||!group.length){
+        return `
+          <div class="podio-col">
+            <div class="podio-wrap"><div class="podio-bar" style="height:${s.h}px; background:rgba(255,255,255,.1)"><span>—</span></div></div>
+            <div style="margin-top:8px; font-weight:800">${s.label}</div>
+            <div class="podio-list" style="opacity:.6">—</div>
+          </div>
+        `;
+      }
+      const itens = group.map(g=>{
+        const nome=String(g.nome||''); const curto = nome.length>22?nome.slice(0,20)+'…':nome;
+        const tempo = typeof g.tempo==='number' ? ` · ${g.tempo.toFixed(1)}s` : '';
+        const pts = typeof g.pontos==='number'?g.pontos:(Number(g.pontos)||0);
+        return `<div style="display:flex; gap:6px; justify-content:center; margin:3px 0"><b>${pts} pts</b><span style="opacity:.65">—</span><span title="${nome}">${curto}${tempo}</span></div>`;
+      }).join('');
+      return `
+        <div class="podio-col">
+          <div class="podio-wrap"><div class="podio-bar" style="height:${s.h}px; background:${s.c}"><span>${group[0].pontos}</span></div></div>
+          <div style="margin-top:8px; font-weight:800">${s.label}</div>
+          <div class="podio-list">${itens}</div>
+        </div>
+      `;
+    };
+
+    const have1=buckets[0]?.length, have2=buckets[1]?.length, have3=buckets[2]?.length;
+    const c2=have2?col(2,buckets[1]):col(2,[]),
+          c1=have1?col(1,buckets[0]):col(1,[]),
+          c3=have3?col(3,buckets[2]):col(3,[]);
+    return `<div id="podioBlock"><h3 class="section-title" style="font-size:1.1rem; margin-bottom:8px;">🥇 Top 3 do Quiz</h3><div class="podio-grid">${c2}${c1}${c3}</div></div>`;
+  }
+
+  function renderPlayerBanner(ranking, { playerName, avatar, lastResult }) {
+    if (!playerName && !lastResult) return '';
+
+    // Procura o jogador no ranking atual
+    const idx = (ranking || []).findIndex(r => String(r.nome||'').trim().toLowerCase() === String(playerName||'').trim().toLowerCase());
+    const places = computePlacements(ranking||[]);
+    const pos = idx >= 0 ? places[idx] : null;
+    const item = idx >= 0 ? ranking[idx] : null;
+
+    // Dados de resultado (do término do quiz)
+    const haveResult = !!(lastResult && typeof lastResult.acertos === 'number' && typeof lastResult.total === 'number');
+    const pct = haveResult ? Math.round((lastResult.acertos / Math.max(1, lastResult.total)) * 100) : null;
+
+    // Medal/icone por posição
+    const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : '🏅';
+
+    // Mensagem curta baseada no desempenho
+    let headline = '';
+    if (pos === 1) headline = `Top! Você está em 1º lugar ${medal}`;
+    else if (pos === 2) headline = `Excelente! Você está em 2º ${medal}`;
+    else if (pos === 3) headline = `Mandou bem! Você está em 3º ${medal}`;
+    else if (haveResult && pct >= 80) headline = `Muito bom! ${pct}% de acertos ${medal}`;
+    else if (haveResult && pct >= 60) headline = `Bom trabalho! ${pct}% de acertos`;
+    else if (haveResult) headline = `Você fez ${pct}% — continue tentando!`;
+
+    // Subtexto com dados objetivos
+    const ac = haveResult ? `${lastResult.acertos}/${lastResult.total}` : (item ? `${item.pontos} acertos` : '');
+    const tempo = item && typeof item.tempo === 'number' ? ` · tempo médio ${item.tempo.toFixed(1)}s` : '';
+
+    // Se não achou no ranking, ainda assim mostra a mensagem de finalização
+    const linha2 = (playerName ? `<b>${playerName}</b>` : '') + (ac ? ` — ${ac}` : '') + tempo;
+
+    // Card bonito
+    return `
+      <div style="
+        margin:12px 0 6px; padding:12px 14px; border-radius:14px;
+        background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2);
+        display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap;
+      ">
+        <div style="font-size:20px">${avatar || '😎'}</div>
+        <div style="text-align:center">
+          <div style="font-weight:800; margin-bottom:2px">${headline || 'Seu resultado foi registrado!'}</div>
+          <div style="opacity:.95">${linha2}</div>
+        </div>
+      </div>
+    `;
+  }
+
+
+  function showError(err){
+    contentElement.innerHTML = `
+      <div class="muted">Erro: ${err && err.message ? err.message : String(err)}</div>
+      <div style="margin-top:10px"><button class="btn" onclick="goHome()">Voltar</button></div>
+    `;
+  }
+
+  // ===== Home: carregar stats
+  function updateHeroStats(){
+    google.script.run
+      .withSuccessHandler(qs=>{
+        quizzesCache = qs || [];
+        if (quizzesCache.length === 1) SINGLE_QUIZ_ID = quizzesCache[0].id;
+        const first = quizzesCache[0];
+        if (!first) return;
+        google.script.run
+          .withSuccessHandler(pergs=>{
+            const n = (pergs||[]).length || '—';
+            document.getElementById('statPerguntas').textContent = n;
+            document.getElementById('statPontos').textContent = (n*200)+'+';
+          })
+          .withFailureHandler(()=>{})
+          .getPerguntas(first.id);
+      })
+      .withFailureHandler(()=>{})
+      .getQuizzes();
+  }
+
+  // ===== Inicial
+  (function init(){
+    show($home);
+    // carrega avatar salvo
+    const saved = localStorage.getItem('EAO_LOBBY');
+    if (saved){
+      try{
+        const o = JSON.parse(saved);
+        if (o.avatar) document.getElementById('avatarChip').textContent = o.avatar;
+        if (o.nome) NOME = o.nome; // se já veio salvo, evita pedir de novo
+      }catch(_){}
+    }
+    updateHeroStats();
+  })();
+</script>
 </body>
 </html>
