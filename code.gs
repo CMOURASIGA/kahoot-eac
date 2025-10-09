@@ -131,131 +131,72 @@ function getPerguntaInfo(quizId, idPergunta) {
 /**
  * Grava uma resposta individual (com índice e tempo)
  */
-function saveResposta(nome, quizId, idPergunta, respostaIndex, tempoSegundos) {
-  try {
-    let respostasSheet = SS.getSheetByName('Respostas');
-    if (!respostasSheet) {
-      respostasSheet = SS.insertSheet('Respostas');
-      respostasSheet.getRange(1, 1, 1, 10).setValues([[
-        'Timestamp',          // A
-        'Nome_Jogador',       // B
-        'ID_Quiz',            // C
-        'ID_Pergunta',        // D
-        'Resposta_Dada',      // E (A/B/C/D/TEMPO_ESGOTADO)
-        'Resposta Correta',   // F (A/B/C/D)
-        'Status',             // G (Correto/Errado/Tempo Esgotado)
-        'Pergunta',           // H (enunciado)
-        'Resposta_Idx',       // I (0..3)
-        'Tempo_Segundos'      // J (0..30)
-      ]]);
-    } else {
-      const header = respostasSheet.getRange(1, 1, 1, respostasSheet.getLastColumn()).getValues()[0];
-      const needed = ['Resposta_Idx','Tempo_Segundos'];
-      for (let need of needed) {
-        if (!header.includes(need)) {
-          respostasSheet.getRange(1, header.length + 1).setValue(need);
-        }
-      }
-    }
+function saveResposta(nome, quizId, idPergunta, respostaIdx, tempoSegundos) {
+  const sh = SS.getSheetByName('Respostas');
+  if (!sh) throw new Error('Aba "Respostas" não encontrada');
 
-    const perguntaInfo = getPerguntaInfo(quizId, idPergunta);
+  const now = new Date();
+  // cabeçalho esperado (ajuste se seu cabeçalho tiver outros nomes)
+  // [Timestamp, Nome_Jogador, Quiz_ID, ID_Pergunta, Resposta_Dada, ..., Resposta_Idx, Tempo_Segundos]
+  const hdr = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0];
+  const idxRespDada = hdr.indexOf('Resposta_Dada'); // mantém compatibilidade
+  const idxRespIdx  = hdr.indexOf('Resposta_Idx');
+  const idxTempo    = hdr.indexOf('Tempo_Segundos');
 
-    let respostaCorreta = '';
-    let status = '';
-    let textoPergunta = '';
+  const linha = new Array(hdr.length).fill('');
+  linha[0] = now;
+  linha[1] = nome;
+  linha[2] = quizId;
+  linha[3] = idPergunta;
 
-    if (perguntaInfo) {
-      respostaCorreta = perguntaInfo.letraCorreta || '';
-      textoPergunta = perguntaInfo.pergunta || '';
-      if (respostaIndex === null || respostaIndex === 'TEMPO_ESGOTADO') {
-        status = 'Tempo Esgotado';
-      } else {
-        status = (respostaIndex === perguntaInfo.indiceCorreto) ? 'Correto' : 'Errado';
-      }
-    }
+  // Se quiser continuar registrando a “letra”, deixe vazio ou converta o índice
+  if (idxRespDada >= 0) linha[idxRespDada] = (Number.isInteger(respostaIdx) ? String.fromCharCode(65 + respostaIdx) : 'TEMPO_ESGOTADO');
+  if (idxRespIdx  >= 0) linha[idxRespIdx]  = Number.isInteger(respostaIdx) ? respostaIdx : '';
+  if (idxTempo    >= 0) linha[idxTempo]    = (typeof tempoSegundos === 'number') ? tempoSegundos : '';
 
-    let respostaDada = '';
-    if (typeof respostaIndex === 'number') {
-      respostaDada = String.fromCharCode(65 + respostaIndex);
-    } else if (respostaIndex === 'TEMPO_ESGOTADO' || respostaIndex === null) {
-      respostaDada = 'TEMPO_ESGOTADO';
-    }
-
-    respostasSheet.appendRow([
-      new Date(), nome, quizId, idPergunta, respostaDada, respostaCorreta, status, textoPergunta
-    ]);
-
-    const lastRow = respostasSheet.getLastRow();
-    const idx = (typeof respostaIndex === 'number') ? respostaIndex : '';
-    const tempo = (typeof tempoSegundos === 'number') ? tempoSegundos : '';
-    respostasSheet.getRange(lastRow, 9).setValue(idx);    // I
-    respostasSheet.getRange(lastRow, 10).setValue(tempo); // J
-  } catch (error) {
-    console.error('❌ Erro em saveResposta:', error);
-    throw new Error(`Erro ao salvar resposta: ${error.message}`);
-  }
+  // Acrescente colunas extras que já usa (Status, Correta, etc) se quiser
+  sh.appendRow(linha);
 }
+
 
 /**
  * Calcula e retorna o resultado final de um jogador
  */
 function finalizarQuiz(nome, quizId) {
-  try {
-    const gabarito = getGabaritoComCache(quizId) || {};
-    const totalPerguntas = Object.keys(gabarito).length;
+  const shResp = SS.getSheetByName('Respostas');
+  const gabarito = getGabaritoComCache(quizId) || {};
+  const data = shResp.getDataRange().getValues();
+  const hdr  = data[0];
 
-    const respostasSheet = SS.getSheetByName('Respostas');
-    if (!respostasSheet) throw new Error('Aba "Respostas" não encontrada');
+  const iNome = 1, iQuiz = 2, iPerg = 3;
+  const iIdx  = hdr.indexOf('Resposta_Idx');
+  const iDada = (hdr.indexOf('Resposta_Dada') >= 0) ? hdr.indexOf('Resposta_Dada') : -1;
 
-    const data = respostasSheet.getDataRange().getValues();
-    if (data.length <= 1) {
-      atualizarRankingComTempo(nome, quizId, 0);
-      return { acertos: 0, total: totalPerguntas };
+  let acertos=0, total=0;
+
+  for (let i=1;i<data.length;i++){
+    const r = data[i];
+    if (String(r[iQuiz]).trim() !== String(quizId).trim()) continue;
+    if (String(r[iNome]).trim() !== String(nome).trim()) continue;
+
+    const idPerg = r[iPerg];
+    if (idPerg == null || gabarito[idPerg] == null) continue;
+
+    let respostaNum = null;
+    if (iIdx >= 0 && typeof r[iIdx] === 'number') {
+      respostaNum = r[iIdx];
+    } else if (iDada >= 0) {
+      const v = r[iDada];
+      if (typeof v === 'string' && v.length===1 && 'ABCD'.includes(v.toUpperCase()))
+        respostaNum = v.toUpperCase().charCodeAt(0) - 65;
     }
 
-    const header = data[0];
-    const idxNome         = 1; // B
-    const idxQuiz         = 2; // C
-    const idxIdPergunta   = 3; // D
-    const idxRespostaDada = header.indexOf('Resposta_Dada') >= 0 ? header.indexOf('Resposta_Dada') : 4; // E
-    const idxRespostaIdx  = header.indexOf('Resposta_Idx'); // I (se existir)
-
-    const respostasJogador = data.slice(1).filter(r =>
-      r[idxNome] && r[idxQuiz] &&
-      String(r[idxNome]).trim() === String(nome).trim() &&
-      String(r[idxQuiz]).trim() === String(quizId).trim()
-    );
-
-    let acertos = 0;
-    for (const resp of respostasJogador) {
-      const idPerg = resp[idxIdPergunta];
-
-      let respostaNum = null;
-      if (idxRespostaIdx >= 0 && typeof resp[idxRespostaIdx] === 'number') {
-        respostaNum = resp[idxRespostaIdx];
-      } else {
-        const rDada = resp[idxRespostaDada];
-        if (rDada && rDada !== 'TEMPO_ESGOTADO') {
-          if (typeof rDada === 'string' && rDada.length === 1) {
-            const letra = rDada.toUpperCase();
-            if (['A','B','C','D'].includes(letra)) respostaNum = letra.charCodeAt(0) - 65;
-          } else if (typeof rDada === 'number') {
-            respostaNum = rDada;
-          }
-        }
-      }
-
-      const corretaNum = gabarito[idPerg];
-      if (typeof corretaNum === 'number' && respostaNum === corretaNum) acertos++;
-    }
-
-    atualizarRankingComTempo(nome, quizId, acertos);
-    return { acertos, total: totalPerguntas };
-  } catch (error) {
-    console.error('❌ Erro em finalizarQuiz:', error);
-    throw new Error(`Erro ao finalizar quiz: ${error.message}`);
+    total++;
+    if (respostaNum === gabarito[idPerg]) acertos++;
   }
+  return { acertos, total };
 }
+
 
 /**
  * Atualiza ou cria a linha do jogador na aba "Ranking" com TempoMedio
@@ -304,83 +245,103 @@ function atualizarRankingComTempo(nome, quizId, acertos) {
  * Ranking completo do quiz (lendo apenas a aba Ranking) com cache leve
  */
 function getRanking(quizId) {
-  const cache = CacheService.getScriptCache();
-  const key = `ranking_${quizId}`;
-  const cached = cache.get(key);
-  if (cached) {
-    try { return JSON.parse(cached); } catch (_) {}
-  }
-
   const sh = SS.getSheetByName('Ranking');
   if (!sh) return [];
 
-  const vals = sh.getDataRange().getValues();
-  if (vals.length <= 1) return [];
+  const data = sh.getDataRange().getValues();
+  const hdr  = data[0];
+  const iNome  = headerIndex(hdr, ['Nome','Nome_Jogador']);
+  const iQuiz  = headerIndex(hdr, ['Quiz','Quiz_ID']);
+  const iPts   = headerIndex(hdr, ['Acertos','Pontuação','Pontos']);
+  const iTempo = headerIndex(hdr, ['TempoMedio','Tempo_Medio','Tempo médio (s)']);
 
-  const hdr = vals[0];
-  const colNome  = 0;
-  const colQuiz  = 1;
-  const colPts   = 2;
-  const colTempo = hdr.indexOf('TempoMedio'); // -1 se não existir
-
-  const list = vals.slice(1)
-    .filter(r => r[colQuiz] && String(r[colQuiz]).trim() === String(quizId).trim())
-    .map(r => ({
-      nome: r[colNome],
-      pontos: Number(r[colPts]) || 0,
-      tempo: (colTempo >= 0 && typeof r[colTempo] === 'number') ? Number(r[colTempo]) : null
-    }))
-    .sort((a, b) => {
-      if (b.pontos !== a.pontos) return b.pontos - a.pontos;
-      if (a.tempo == null && b.tempo == null) return 0;
-      if (a.tempo == null) return 1;
-      if (b.tempo == null) return -1;
-      return a.tempo - b.tempo;
+  const rows = [];
+  for (let i=1;i<data.length;i++){
+    const r = data[i];
+    if (String(r[iQuiz]).trim() !== String(quizId).trim()) continue;
+    rows.push({
+      nome:   r[iNome],
+      pontos: Number(r[iPts]) || 0,
+      tempo:  (iTempo>=0 && r[iTempo] !== '') ? Number(r[iTempo]) : null
     });
+  }
 
-  // cache por 120s (ajuste conforme necessidade)
-  cache.put(key, JSON.stringify(list), 120);
-  return list;
+  // mesma ordenação usada no front
+  rows.sort((a,b)=>{
+    if (b.pontos !== a.pontos) return b.pontos - a.pontos;            // mais acertos primeiro
+    if (a.tempo == null && b.tempo != null) return 1;                 // quem não tem tempo, vai depois
+    if (a.tempo != null && b.tempo == null) return -1;
+    if (a.tempo != null && b.tempo != null) return a.tempo - b.tempo; // menor tempo primeiro
+    return 0;
+  });
+  return rows;
 }
+
+function headerIndex(hdr, aliases){
+  for (const a of aliases){
+    const i = hdr.findIndex(h => (h||'').toString().trim().toLowerCase() === a.toLowerCase());
+    if (i>=0) return i;
+  }
+  return -1;
+}
+
 
 /**
  * Últimos resultados por quiz (otimizado para planilhas grandes)
  */
 function getUltimosResultados(quizId, limit) {
-  try {
-    const sh = SS.getSheetByName('Respostas');
-    if (!sh) return [];
-    const lastRow = sh.getLastRow();
-    if (lastRow < 2) return [];
+  const sh = SS.getSheetByName('Respostas');
+  if (!sh) return [];
+  const data = sh.getDataRange().getValues();
+  const hdr = data[0];
 
-    const MAX_SCAN = 1500; // examina no máximo as últimas N respostas
-    const rowsToRead = Math.min(MAX_SCAN, lastRow - 1);
-    const startRow = Math.max(2, lastRow - rowsToRead + 1);
+  const iTs   = 0;
+  const iNome = 1;
+  const iQuiz = 2;
+  const iPerg = 3;
+  const iStat = hdr.indexOf('Status');
+  const iDada = hdr.indexOf('Resposta_Dada');
+  const iCorr = hdr.indexOf('Resposta_Correta');
 
-    // Leia apenas A..H (ou aumente se precisar de mais colunas)
-    const range = sh.getRange(startRow, 1, rowsToRead, 8); // A:H
-    const data = range.getValues();
-
-    const filtrados = data
-      .filter(r => r[2] && r[2].toString().trim() === quizId.toString().trim())
-      .map(r => ({
-        timestamp: r[0],
-        nome: r[1],
-        quiz: r[2],
-        idPergunta: r[3],
-        respostaDada: r[4],
-        respostaCorreta: r[5],
-        status: r[6],
-        pergunta: r[7]
-      }))
-      .sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-    return filtrados.slice(0, Math.max(1, limit || 50));
-  } catch (e) {
-    console.error('getUltimosResultados fast', e);
-    return [];
+  const rows = [];
+  for (let i=1;i<data.length;i++){
+    const r = data[i];
+    if (String(r[iQuiz]).trim() !== String(quizId).trim()) continue;
+    rows.push({
+      timestamp: r[iTs],
+      nome: r[iNome],
+      idPergunta: r[iPerg],
+      status: iStat>=0 ? r[iStat] : '',
+      respostaDada: iDada>=0 ? r[iDada] : '',
+      respostaCorreta: iCorr>=0 ? r[iCorr] : ''
+    });
   }
+  rows.sort((a,b)=> new Date(b.timestamp) - new Date(a.timestamp));
+  return rows.slice(0, limit || 30);
 }
+
+/*
+geração de numeros reais da tela inicial
+*/
+function getStats() {
+  const shResp = SS.getSheetByName('Respostas');
+  const shPerg = SS.getSheetByName('quiz_perguntas');
+  const totalPerguntas = shPerg ? (shPerg.getLastRow()-1) : 0;
+
+  let jogadores = new Set();
+  let respostas = 0;
+  if (shResp && shResp.getLastRow()>1){
+    const data = shResp.getRange(2,1,shResp.getLastRow()-1,2).getValues(); // timestamp, nome
+    respostas = data.length;
+    data.forEach(r => { if (r[1]) jogadores.add(String(r[1]).trim()); });
+  }
+  return {
+    totalPerguntas,
+    totalJogadores: jogadores.size,
+    totalRespostas: respostas
+  };
+}
+
 
 /**
  * Gabarito com CacheService
@@ -706,6 +667,3 @@ function recomputarRankingTodos() {
   }
   return { quizzes: quizzes.length, totalJogadores };
 }
-
-
-
