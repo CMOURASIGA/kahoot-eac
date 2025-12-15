@@ -1,3 +1,246 @@
+// =================================================================
+// Bloco de Jogo em Tempo Real (Kahoot)
+// =================================================================
+
+const CACHE_EXPIRATION = 3600 * 4; // 4 horas
+
+// --- Funções de Jogo ---
+
+/**
+ * Cria uma nova sessão de jogo para um quiz específico.
+ * Chamado pelo anfitrião (host).
+ * @param {string} quizId O ID do quiz a ser jogado.
+ * @param {number} tempoPorPergunta O tempo em segundos para cada pergunta.
+ * @param {string} modoDeJogo O modo de avanço ('automatico' ou 'manual').
+ * @returns {object} Contendo { pin, hostId }
+ */
+function createGameSession(quizId, tempoPorPergunta, modoDeJogo) {
+  const cache = CacheService.getScriptCache();
+  const pin = generatePin();
+  const hostId = Utilities.getUuid();
+
+  const perguntas = getPerguntas(quizId);
+  if (!perguntas || perguntas.length === 0) {
+    throw new Error(`Quiz com ID '${quizId}' não encontrado ou não possui perguntas.`);
+  }
+
+  const gameState = {
+    pin,
+    hostId,
+    quizId,
+    perguntas,
+    tempoPorPergunta: parseInt(tempoPorPergunta) > 0 ? parseInt(tempoPorPergunta) : 40,
+    modoDeJogo: modoDeJogo === 'manual' ? 'manual' : 'automatico', // Adicionado
+    players: {}, // { nome: { avatar, score } }
+    status: 'LOBBY', // LOBBY, QUESTION, LEADERBOARD, FINAL
+    currentQuestionIndex: -1,
+    questionStartTime: null,
+    answers: {}, // { nome: { answerIdx, time, score } }
+    lastAnswers: {}, // Adicionado para feedback
+    leaderboard: []
+  };
+
+  cache.put(pin, JSON.stringify(gameState), CACHE_EXPIRATION);
+  return { pin, hostId };
+}
+
+/**
+ * Permite que um jogador entre em um jogo existente.
+ * @param {string} pin O PIN do jogo.
+ * @param {string} nome O nome do jogador.
+ * @param {string} avatar O avatar do jogador.
+ * @returns {object} O estado atual do jogo.
+ */
+function joinGame(pin, nome, avatar) {
+  const cache = CacheService.getScriptCache();
+  const gameJSON = cache.get(pin);
+  if (!gameJSON) throw new Error("Jogo não encontrado. Verifique o PIN.");
+
+  const gameState = JSON.parse(gameJSON);
+  if (gameState.status !== 'LOBBY') throw new Error("Este jogo já começou.");
+  if (gameState.players[nome]) throw new Error("Este nome já está em uso neste jogo.");
+
+  gameState.players[nome] = { avatar: avatar, score: 0, correctCount: 0 };
+  
+  cache.put(pin, JSON.stringify(gameState), CACHE_EXPIRATION);
+  return gameState;
+}
+
+/**
+ * Retorna o estado atual de um jogo.
+ * Usado por todos os clientes (jogadores e host) para polling.
+ * @param {string} pin O PIN do jogo.
+ * @returns {object} O estado do jogo. Partes sensíveis (respostas corretas) são removidas.
+ */
+function getGameState(pin) {
+  const cache = CacheService.getScriptCache();
+  const gameJSON = cache.get(pin);
+  if (!gameJSON) return null; // Jogo não existe mais
+
+  const gameState = JSON.parse(gameJSON);
+  
+  // Remove dados sensíveis antes de enviar para os clientes
+  const clientState = JSON.parse(JSON.stringify(gameState)); // Deep copy
+  if (clientState.perguntas) {
+    clientState.perguntas.forEach(p => {
+      delete p.correta;
+      delete p.letraCorreta;
+    });
+  }
+  
+  // Revela a resposta correta da pergunta ANTERIOR nos estágios apropriados
+  if (clientState.status === 'ANSWER_REVEAL' || clientState.status === 'LEADERBOARD' || clientState.status === 'FINAL') {
+    const lastQuestionIndex = clientState.currentQuestionIndex;
+    if (lastQuestionIndex >= 0 && gameState.perguntas[lastQuestionIndex]) {
+       clientState.lastCorrectAnswer = gameState.perguntas[lastQuestionIndex].correta;
+    }
+  }
+
+  return clientState;
+}
+
+/**
+ * Inicia o jogo. Apenas o anfitrião pode chamar.
+ * @param {string} pin O PIN do jogo.
+ * @param {string} hostId O UUID do anfitrião para autorização.
+ */
+function startGame(pin, hostId) {
+  const cache = CacheService.getScriptCache();
+  const gameState = getAndValidateState(pin, hostId, cache);
+
+  if (gameState.status !== 'LOBBY') throw new Error("O jogo já começou.");
+
+  gameState.status = 'QUESTION';
+  gameState.currentQuestionIndex = 0;
+  gameState.questionStartTime = Date.now();
+  gameState.answers = {};
+  
+  cache.put(pin, JSON.stringify(gameState), CACHE_EXPIRATION);
+  return gameState;
+}
+
+/**
+ * Avança o estado do jogo (ex: de Pergunta para Placar, de Placar para Próxima Pergunta).
+ * Apenas o anfitrião pode chamar.
+ * @param {string} pin O PIN do jogo.
+ * @param {string} hostId O UUID do anfitrião.
+ */
+function nextGameState(pin, hostId) {
+  const cache = CacheService.getScriptCache();
+  const gameState = getAndValidateState(pin, hostId, cache);
+
+  switch (gameState.status) {
+    case 'QUESTION':
+      // Transição de Pergunta -> Revelação da Resposta
+      gameState.status = 'ANSWER_REVEAL';
+      gameState.lastAnswers = { ...gameState.answers }; // Salva as respostas da rodada
+      break;
+
+    case 'ANSWER_REVEAL':
+      // Transição de Revelação -> Placar
+      gameState.status = 'LEADERBOARD';
+      updateLeaderboard(gameState);
+      break;
+      
+    case 'LEADERBOARD':
+      // Transição de Placar -> Próxima Pergunta ou Final
+      const nextIndex = gameState.currentQuestionIndex + 1;
+      if (nextIndex < gameState.perguntas.length) {
+        gameState.status = 'QUESTION';
+        gameState.currentQuestionIndex = nextIndex;
+        gameState.questionStartTime = Date.now();
+        gameState.answers = {}; // Limpa as respostas para a nova pergunta
+      } else {
+        gameState.status = 'FINAL';
+        updateLeaderboard(gameState); // Ranking final
+      }
+      break;
+  }
+  
+  cache.put(pin, JSON.stringify(gameState), CACHE_EXPIRATION);
+  return gameState;
+}
+
+
+/**
+ * Um jogador envia sua resposta.
+ * @param {string} pin O PIN do jogo.
+ * @param {string} nome O nome do jogador.
+ * @param {number} respostaIdx O índice da resposta escolhida (0-3).
+ * @param {number} tempoGasto O tempo em segundos que o jogador levou.
+ */
+function submitAnswer(pin, nome, respostaIdx, tempoGasto) {
+  const cache = CacheService.getScriptCache();
+  const gameJSON = cache.get(pin);
+  if (!gameJSON) throw new Error("Jogo não encontrado.");
+
+  const gameState = JSON.parse(gameJSON);
+
+  if (gameState.status !== 'QUESTION') throw new Error("A votação está encerrada.");
+  if (gameState.answers[nome]) throw new Error("Você já respondeu a esta pergunta.");
+  if (!gameState.players[nome]) throw new Error("Jogador não encontrado nesta partida.");
+
+  const question = gameState.perguntas[gameState.currentQuestionIndex];
+  const isCorrect = (question.correta === respostaIdx);
+  
+  // Lógica de pontuação: mais pontos por responder mais rápido
+  let points = 0;
+  if (isCorrect) {
+    const timeFactor = (gameState.tempoPorPergunta - tempoGasto) / gameState.tempoPorPergunta; // ex: 0 a 1
+    points = 500 + Math.round(500 * timeFactor); // Base 500, bônus de até 500
+  }
+
+  gameState.answers[nome] = { respostaIdx, tempoGasto, points };
+  gameState.players[nome].score += points;
+  if (isCorrect) {
+    gameState.players[nome].correctCount = (gameState.players[nome].correctCount || 0) + 1;
+  }
+  
+  // Salva a resposta individual na planilha para análise posterior
+  try {
+     saveResposta(nome, gameState.quizId, question.id, respostaIdx, tempoGasto);
+  } catch(e) {
+    console.error(`Falha ao salvar resposta individual para ${nome}: ${e.toString()}`);
+  }
+  
+  cache.put(pin, JSON.stringify(gameState), CACHE_EXPIRATION);
+  return { pointsEarned: points };
+}
+
+
+// --- Funções Auxiliares do Jogo ---
+
+function generatePin() {
+  return Math.floor(1000 + Math.random() * 9000).toString();
+}
+
+function getAndValidateState(pin, hostId, cache) {
+  const gameJSON = cache.get(pin);
+  if (!gameJSON) throw new Error("Jogo não encontrado.");
+  
+  const gameState = JSON.parse(gameJSON);
+  if (gameState.hostId !== hostId) throw new Error("Apenas o anfitrião pode realizar esta ação.");
+  
+  return gameState;
+}
+
+function updateLeaderboard(gameState) {
+    const playerNames = Object.keys(gameState.players);
+    const leaderboard = playerNames.map(name => ({
+      nome: name,
+      avatar: gameState.players[name].avatar,
+      score: gameState.players[name].score,
+      correctCount: gameState.players[name].correctCount || 0
+    }));
+
+    leaderboard.sort((a, b) => b.score - a.score);
+    gameState.leaderboard = leaderboard;
+}
+
+// =================================================================
+// Bloco Original (com adaptações)
+// =================================================================
+
 // Referência fixa à planilha
 const SS = SpreadsheetApp.openById('1bURN_kRxY4Q3lTxVSgn67URkVlUrBX0hfj3DMFlnqQ0');
 
@@ -96,31 +339,53 @@ function getPerguntas(quizID) {
 }
 
 /**
- * Busca informações completas de uma pergunta específica
+ * Grava uma resposta individual (com índice e tempo)
  */
+function saveResposta(nome, quizId, idPergunta, respostaIdx, tempoSegundos) {
+  try {
+    const sh = SS.getSheetByName('Respostas');
+    if (!sh) throw new Error('Aba "Respostas" não encontrada');
+
+    const now = new Date();
+    const hdr = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0];
+    const idxRespDada = hdr.indexOf('Resposta_Dada');
+    const idxRespIdx  = hdr.indexOf('Resposta_Idx');
+    const idxTempo    = hdr.indexOf('Tempo_Segundos');
+
+    const linha = new Array(hdr.length).fill('');
+    linha[0] = now;
+    linha[1] = nome;
+    linha[2] = quizId;
+    linha[3] = idPergunta;
+
+    if (idxRespDada >= 0) linha[idxRespDada] = (Number.isInteger(respostaIdx) ? String.fromCharCode(65 + respostaIdx) : 'TEMPO_ESGOTADO');
+    if (idxRespIdx  >= 0) linha[idxRespIdx]  = Number.isInteger(respostaIdx) ? respostaIdx : '';
+    if (idxTempo    >= 0) linha[idxTempo]    = (typeof tempoSegundos === 'number') ? tempoSegundos : '';
+
+    sh.appendRow(linha);
+  } catch (e) {
+    console.error("Falha em saveResposta:", e);
+    // Não lançar erro para não quebrar a execução do jogo principal
+  }
+}
+
+// Manter as funções abaixo para compatibilidade ou uso futuro, mas não são centrais para o novo modo de jogo
 function getPerguntaInfo(quizId, idPergunta) {
   try {
     const sheet = SS.getSheetByName('quiz_perguntas');
     if (!sheet) throw new Error('Aba "quiz_perguntas" não encontrada na planilha');
-
     const data = sheet.getDataRange().getValues();
-
     const perguntaRow = data.find(row =>
       row[0] && row[1] &&
       row[0].toString().trim() === quizId.toString().trim() &&
       row[1].toString().trim() === idPergunta.toString().trim()
     );
-
     if (!perguntaRow) return null;
-
     const letraCorreta = perguntaRow[7] ? perguntaRow[7].toString().trim().toUpperCase() : null;
-
     return {
       pergunta: perguntaRow[2] ? perguntaRow[2].toString().trim() : '',
       letraCorreta,
-      indiceCorreto: letraCorreta && ['A','B','C','D'].includes(letraCorreta)
-        ? letraCorreta.charCodeAt(0) - 65
-        : null
+      indiceCorreto: letraCorreta && ['A','B','C','D'].includes(letraCorreta) ? letraCorreta.charCodeAt(0) - 65 : null
     };
   } catch (error) {
     console.error('❌ Erro em getPerguntaInfo:', error);
@@ -128,232 +393,114 @@ function getPerguntaInfo(quizId, idPergunta) {
   }
 }
 
-/**
- * Grava uma resposta individual (com índice e tempo)
- */
-function saveResposta(nome, quizId, idPergunta, respostaIdx, tempoSegundos) {
-  const sh = SS.getSheetByName('Respostas');
-  if (!sh) throw new Error('Aba "Respostas" não encontrada');
-
-  const now = new Date();
-  // cabeçalho esperado (ajuste se seu cabeçalho tiver outros nomes)
-  // [Timestamp, Nome_Jogador, Quiz_ID, ID_Pergunta, Resposta_Dada, ..., Resposta_Idx, Tempo_Segundos]
-  const hdr = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0];
-  const idxRespDada = hdr.indexOf('Resposta_Dada'); // mantém compatibilidade
-  const idxRespIdx  = hdr.indexOf('Resposta_Idx');
-  const idxTempo    = hdr.indexOf('Tempo_Segundos');
-
-  const linha = new Array(hdr.length).fill('');
-  linha[0] = now;
-  linha[1] = nome;
-  linha[2] = quizId;
-  linha[3] = idPergunta;
-
-  // Se quiser continuar registrando a “letra”, deixe vazio ou converta o índice
-  if (idxRespDada >= 0) linha[idxRespDada] = (Number.isInteger(respostaIdx) ? String.fromCharCode(65 + respostaIdx) : 'TEMPO_ESGOTADO');
-  if (idxRespIdx  >= 0) linha[idxRespIdx]  = Number.isInteger(respostaIdx) ? respostaIdx : '';
-  if (idxTempo    >= 0) linha[idxTempo]    = (typeof tempoSegundos === 'number') ? tempoSegundos : '';
-
-  // Acrescente colunas extras que já usa (Status, Correta, etc) se quiser
-  sh.appendRow(linha);
-}
-
-
-/**
- * Calcula e retorna o resultado final de um jogador
- */
-function finalizarQuiz(nome, quizId) {
+function recomputarRankingQuiz(quizId) {
+  // Esta função pode precisar de ajustes ou ser depreciada em favor do ranking ao vivo
+  // Por enquanto, a mantemos como está.
+  if (!quizId) throw new Error('quizId obrigatório');
   const shResp = SS.getSheetByName('Respostas');
-  const gabarito = getGabaritoComCache(quizId) || {};
+  if (!shResp) throw new Error('Aba "Respostas" não encontrada');
   const data = shResp.getDataRange().getValues();
-  const hdr  = data[0];
-
-  const iNome = 1, iQuiz = 2, iPerg = 3;
-  const iIdx  = hdr.indexOf('Resposta_Idx');
-  const iDada = (hdr.indexOf('Resposta_Dada') >= 0) ? hdr.indexOf('Resposta_Dada') : -1;
-
-  let acertos=0, total=0;
-
-  for (let i=1;i<data.length;i++){
-    const r = data[i];
-    if (String(r[iQuiz]).trim() !== String(quizId).trim()) continue;
-    if (String(r[iNome]).trim() !== String(nome).trim()) continue;
-
-    const idPerg = r[iPerg];
-    if (idPerg == null || gabarito[idPerg] == null) continue;
-
-    let respostaNum = null;
-    if (iIdx >= 0 && typeof r[iIdx] === 'number') {
-      respostaNum = r[iIdx];
-    } else if (iDada >= 0) {
-      const v = r[iDada];
-      if (typeof v === 'string' && v.length===1 && 'ABCD'.includes(v.toUpperCase()))
-        respostaNum = v.toUpperCase().charCodeAt(0) - 65;
-    }
-
-    total++;
-    if (respostaNum === gabarito[idPerg]) acertos++;
-  }
-  return { acertos, total };
-}
-
-
-/**
- * Atualiza ou cria a linha do jogador na aba "Ranking" com TempoMedio
- * e invalida o cache de ranking do quiz.
- */
-function atualizarRankingComTempo(nome, quizId, acertos) {
-  let rankSheet = SS.getSheetByName('Ranking');
-  if (!rankSheet) {
-    rankSheet = SS.insertSheet('Ranking');
-    rankSheet.getRange(1, 1, 1, 4).setValues([['Nome', 'Quiz', 'Acertos', 'TempoMedio']]);
-  } else {
-    const hdrNow = rankSheet.getRange(1, 1, 1, rankSheet.getLastColumn()).getValues()[0];
-    if (!hdrNow.includes('TempoMedio')) {
-      rankSheet.getRange(1, hdrNow.length + 1).setValue('TempoMedio');
-    }
-  }
-
-  const tempoMedio = tempoMedioJogadorNoQuiz(nome, quizId);
-
-  const vals = rankSheet.getDataRange().getValues();
-  const hdr  = vals[0];
-  const colTempo = hdr.indexOf('TempoMedio');
-  const rowIdx = vals.findIndex((r, i) =>
-    i > 0 &&
-    String(r[0]).trim() === String(nome).trim() &&
-    String(r[1]).trim() === String(quizId).trim()
-  );
-
-  if (rowIdx >= 1) {
-    rankSheet.getRange(rowIdx + 1, 3).setValue(acertos); // Acertos
-    if (colTempo >= 0 && tempoMedio !== null) {
-      rankSheet.getRange(rowIdx + 1, colTempo + 1).setValue(tempoMedio);
-    }
-  } else {
-    const nova = [nome, quizId, acertos];
-    if (colTempo >= 0) nova.push(tempoMedio);
-    rankSheet.appendRow(nova);
-  }
-
-  try {
-    CacheService.getScriptCache().remove(`ranking_${quizId}`);
-  } catch (_) {}
-}
-
-/**
- * Ranking completo do quiz (lendo apenas a aba Ranking) com cache leve
- */
-function getRanking(quizId) {
-  const sh = SS.getSheetByName('Ranking');
-  if (!sh) return [];
-
-  const data = sh.getDataRange().getValues();
-  const hdr  = data[0];
-  const iNome  = headerIndex(hdr, ['Nome','Nome_Jogador']);
-  const iQuiz  = headerIndex(hdr, ['Quiz','Quiz_ID']);
-  const iPts   = headerIndex(hdr, ['Acertos','Pontuação','Pontos']);
-  const iTempo = headerIndex(hdr, ['TempoMedio','Tempo_Medio','Tempo médio (s)']);
-
-  const rows = [];
-  for (let i=1;i<data.length;i++){
-    const r = data[i];
-    if (String(r[iQuiz]).trim() !== String(quizId).trim()) continue;
-    rows.push({
-      nome:   r[iNome],
-      pontos: Number(r[iPts]) || 0,
-      tempo:  (iTempo>=0 && r[iTempo] !== '') ? Number(r[iTempo]) : null
-    });
-  }
-
-  // mesma ordenação usada no front
-  rows.sort((a,b)=>{
-    if (b.pontos !== a.pontos) return b.pontos - a.pontos;            // mais acertos primeiro
-    if (a.tempo == null && b.tempo != null) return 1;                 // quem não tem tempo, vai depois
-    if (a.tempo != null && b.tempo == null) return -1;
-    if (a.tempo != null && b.tempo != null) return a.tempo - b.tempo; // menor tempo primeiro
-    return 0;
-  });
-  return rows;
-}
-
-function headerIndex(hdr, aliases){
-  for (const a of aliases){
-    const i = hdr.findIndex(h => (h||'').toString().trim().toLowerCase() === a.toLowerCase());
-    if (i>=0) return i;
-  }
-  return -1;
-}
-
-
-/**
- * Últimos resultados por quiz (otimizado para planilhas grandes)
- */
-function getUltimosResultados(quizId, limit) {
-  const sh = SS.getSheetByName('Respostas');
-  if (!sh) return [];
-  const data = sh.getDataRange().getValues();
+  if (data.length <= 1) return { quizId, jogadores: 0, respostasConsideradas: 0 };
   const hdr = data[0];
-
-  const iTs   = 0;
-  const iNome = 1;
-  const iQuiz = 2;
-  const iPerg = 3;
-  const iStat = hdr.indexOf('Status');
-  const iDada = hdr.indexOf('Resposta_Dada');
-  const iCorr = hdr.indexOf('Resposta_Correta');
-
-  const rows = [];
-  for (let i=1;i<data.length;i++){
+  const idxNome   = 1; const idxQuiz   = 2; const idxPerg   = 3;
+  const idxResp   = hdr.indexOf('Resposta_Dada') >= 0 ? hdr.indexOf('Resposta_Dada') : 4;
+  const idxIdx    = hdr.indexOf('Resposta_Idx');
+  const idxTempo  = hdr.indexOf('Tempo_Segundos');
+  const gabarito = getGabaritoComCache(quizId) || {};
+  const byPlayer = new Map();
+  let respostasConsideradas = 0;
+  for (let i = 1; i < data.length; i++) {
     const r = data[i];
-    if (String(r[iQuiz]).trim() !== String(quizId).trim()) continue;
-    rows.push({
-      timestamp: r[iTs],
-      nome: r[iNome],
-      idPergunta: r[iPerg],
-      status: iStat>=0 ? r[iStat] : '',
-      respostaDada: iDada>=0 ? r[iDada] : '',
-      respostaCorreta: iCorr>=0 ? r[iCorr] : ''
-    });
+    if (!r[idxQuiz] || String(r[idxQuiz]).trim() !== String(quizId).trim()) continue;
+    const nome = (r[idxNome] || '').toString().trim();
+    if (!nome) continue;
+    const idPerg = r[idxPerg];
+    if (idPerg == null || gabarito[idPerg] == null) continue;
+    let respostaNum = null;
+    if (idxIdx >= 0 && typeof r[idxIdx] === 'number') {
+      respostaNum = r[idxIdx];
+    } else {
+      const respDada = r[idxResp];
+      if (respDada && respDada !== 'TEMPO_ESGOTADO') {
+        if (typeof respDada === 'string' && respDada.length === 1) {
+          const letra = respDada.toUpperCase();
+          if (['A','B','C','D'].includes(letra)) respostaNum = letra.charCodeAt(0) - 65;
+        } else if (typeof respDada === 'number') {
+          respostaNum = respDada;
+        }
+      }
+    }
+    let t = 30;
+    if (idxTempo >= 0 && typeof r[idxTempo] === 'number') t = r[idxTempo];
+    if (!byPlayer.has(nome)) byPlayer.set(nome, { acertos: 0, somaTempo: 0, nTempo: 0 });
+    const agg = byPlayer.get(nome);
+    const corretaNum = gabarito[idPerg];
+    if (typeof corretaNum === 'number' && respostaNum === corretaNum) agg.acertos++;
+    agg.somaTempo += t;
+    agg.nTempo += 1;
+    respostasConsideradas++;
   }
-  rows.sort((a,b)=> new Date(b.timestamp) - new Date(a.timestamp));
-  return rows.slice(0, limit || 30);
+  let shRank = SS.getSheetByName('Ranking');
+  if (!shRank) {
+    shRank = SS.insertSheet('Ranking');
+    shRank.getRange(1, 1, 1, 4).setValues([['Nome', 'Quiz', 'Acertos', 'TempoMedio']]);
+  }
+  const rankHdr = shRank.getRange(1, 1, 1, Math.max(4, shRank.getLastColumn())).getValues()[0];
+  const colNome  = findHeaderIndex(rankHdr, ['Nome', 'Nome_Jogador'])        ?? 0;
+  const colQuiz  = findHeaderIndex(rankHdr, ['Quiz', 'Quiz_ID'])              ?? 1;
+  const colPts   = findHeaderIndex(rankHdr, ['Acertos', 'Pontuação', 'Pontos']) ?? 2;
+  let   colTempo = findHeaderIndex(rankHdr, ['TempoMedio', 'Tempo_Medio', 'Tempo médio (s)']);
+  if (colTempo == null) {
+    colTempo = rankHdr.length;
+    shRank.getRange(1, colTempo + 1).setValue('TempoMedio');
+  }
+  const lastRowRank = shRank.getLastRow();
+  for (let i = lastRowRank; i >= 2; i--) {
+    const quizCell = shRank.getRange(i, colQuiz + 1).getValue();
+    if (String(quizCell).trim() === String(quizId).trim()) {
+      shRank.deleteRow(i);
+    }
+  }
+  const rows = [];
+  for (const [nome, agg] of byPlayer.entries()) {
+    const tempoMedio = agg.nTempo ? (agg.somaTempo / agg.nTempo) : null;
+    const row = [];
+    row[colNome]  = nome;
+    row[colQuiz]  = quizId;
+    row[colPts]   = agg.acertos;
+    row[colTempo] = tempoMedio;
+    const maxIndex = Math.max(colNome, colQuiz, colPts, colTempo);
+    while (row.length < maxIndex + 1) row.push('');
+    rows.push(row);
+  }
+  if (rows.length) {
+    shRank.insertRowsAfter(1, rows.length);
+    shRank.getRange(2, 1, rows.length, Math.max(rankHdr.length, colTempo + 1)).setValues(
+      rows.map(r => {
+        const copy = r.slice();
+        while (copy.length < Math.max(rankHdr.length, colTempo + 1)) copy.push('');
+        return copy;
+      })
+    );
+  }
+  try { CacheService.getScriptCache().remove(`ranking_${quizId}`); } catch (_) {}
+  return { quizId, jogadores: rows.length, respostasConsideradas };
 }
 
-/*
-geração de numeros reais da tela inicial
-*/
-function getStats() {
-  const shResp = SS.getSheetByName('Respostas');
-  const shPerg = SS.getSheetByName('quiz_perguntas');
-  const totalPerguntas = shPerg ? (shPerg.getLastRow()-1) : 0;
-
-  let jogadores = new Set();
-  let respostas = 0;
-  if (shResp && shResp.getLastRow()>1){
-    const data = shResp.getRange(2,1,shResp.getLastRow()-1,2).getValues(); // timestamp, nome
-    respostas = data.length;
-    data.forEach(r => { if (r[1]) jogadores.add(String(r[1]).trim()); });
+function findHeaderIndex(headerArray, aliases) {
+  for (const a of aliases) {
+    const idx = headerArray.findIndex(h => (h || '').toString().trim().toLowerCase() === a.toLowerCase());
+    if (idx >= 0) return idx;
   }
-  return {
-    totalPerguntas,
-    totalJogadores: jogadores.size,
-    totalRespostas: respostas
-  };
+  return null;
 }
 
-
-/**
- * Gabarito com CacheService
- */
 function getGabaritoComCache(quizId) {
   const cache = CacheService.getScriptCache();
   const key = `gabarito_${quizId}`;
   const cached = cache.get(key);
   if (cached) {
-    try {
-      return JSON.parse(cached);
-    } catch (_) {}
+    try { return JSON.parse(cached); } catch (_) {}
   }
 
   const perguntasSheet = SS.getSheetByName('quiz_perguntas');
@@ -372,298 +519,4 @@ function getGabaritoComCache(quizId) {
 
   cache.put(key, JSON.stringify(gabarito), 600); // 10 minutos
   return gabarito;
-}
-
-function limparCacheGabarito(quizId) {
-  const cache = CacheService.getScriptCache();
-  cache.remove(`gabarito_${quizId}`);
-  return 'Cache limpo';
-}
-
-/**
- * Calcula tempo médio (em segundos) do jogador em um quiz.
- * Se não houver tempo salvo numa resposta, assume 30s.
- */
-function tempoMedioJogadorNoQuiz(nome, quizId) {
-  const sh = SS.getSheetByName('Respostas');
-  if (!sh) return null;
-
-  const data = sh.getDataRange().getValues();
-  if (data.length <= 1) return null;
-
-  const header = data[0];
-  const idxNome   = 1; // B
-  const idxQuiz   = 2; // C
-  const idxTempo  = header.indexOf('Tempo_Segundos'); // J (ou onde estiver)
-
-  let soma = 0, n = 0;
-
-  for (let i = 1; i < data.length; i++) {
-    const r = data[i];
-    if (String(r[idxNome]).trim() === String(nome).trim() &&
-        String(r[idxQuiz]).trim() === String(quizId).trim()) {
-      let t = 30;
-      if (idxTempo >= 0 && typeof r[idxTempo] === 'number') t = r[idxTempo];
-      soma += t;
-      n++;
-    }
-  }
-
-  if (!n) return null;
-  return soma / n;
-}
-
-/**
- * Ferramentas utilitárias (opcionais)
- */
-function atualizarRespostasExistentes() {
-  try {
-    const respostasSheet = SS.getSheetByName('Respostas');
-    if (!respostasSheet) return 'Aba Respostas não encontrada';
-
-    const data = respostasSheet.getDataRange().getValues();
-    const header = data[0];
-
-    if (header.length >= 8 && header[5] === 'Resposta Correta' && header[6] === 'Status' && header[7] === 'Pergunta') {
-      for (let i = 1; i < data.length; i++) {
-        const row = data[i];
-        const quizId = row[2];
-        const idPergunta = row[3];
-        const respostaDada = row[4];
-
-        const perguntaInfo = getPerguntaInfo(quizId, idPergunta);
-        if (perguntaInfo) {
-          let status = '';
-          let respostaIndex = null;
-
-          if (respostaDada && respostaDada !== 'TEMPO_ESGOTADO') {
-            if (typeof respostaDada === 'string' && respostaDada.length === 1) {
-              const letra = respostaDada.toUpperCase();
-              if (['A', 'B', 'C', 'D'].includes(letra)) respostaIndex = letra.charCodeAt(0) - 65;
-            } else if (typeof respostaDada === 'number') {
-              respostaIndex = respostaDada;
-            }
-          }
-
-          if (respostaDada === 'TEMPO_ESGOTADO' || respostaDada === null) {
-            status = 'Tempo Esgotado';
-          } else {
-            status = (respostaIndex === perguntaInfo.indiceCorreto) ? 'Correto' : 'Errado';
-          }
-
-          respostasSheet.getRange(i + 1, 6).setValue(perguntaInfo.letraCorreta || ''); // F
-          respostasSheet.getRange(i + 1, 7).setValue(status); // G
-          respostasSheet.getRange(i + 1, 8).setValue(perguntaInfo.pergunta || ''); // H
-        }
-      }
-      return 'Dados atualizados com sucesso';
-    } else {
-      const newHeader = [...header];
-      while (newHeader.length < 8) {
-        if (newHeader.length === 5) newHeader.push('Resposta Correta');
-        else if (newHeader.length === 6) newHeader.push('Status');
-        else if (newHeader.length === 7) newHeader.push('Pergunta');
-      }
-      respostasSheet.getRange(1, 1, 1, newHeader.length).setValues([newHeader]);
-      return 'Novas colunas adicionadas. Execute novamente para preencher os dados.';
-    }
-  } catch (error) {
-    console.error('❌ Erro em atualizarRespostasExistentes:', error);
-    return `Erro: ${error.message}`;
-  }
-}
-
-function testarEstrutura() {
-  try {
-    const planilha = SpreadsheetApp.openById('1bURN_kRxY4Q3lTxVSgn67URkVlUrBX0hfj3DMFlnqQ0');
-    const sheetPerguntas = planilha.getSheetByName('quiz_perguntas');
-    const sheetRespostas = planilha.getSheetByName('Respostas');
-    const abas = planilha.getSheets().map(s => s.getName());
-    return JSON.stringify({
-      planilha: planilha.getName(),
-      tem_quiz_perguntas: !!sheetPerguntas,
-      tem_respostas: !!sheetRespostas,
-      abas
-    });
-  } catch (error) {
-    console.error('❌ Erro no teste:', error);
-    return `Erro: ${error.message}`;
-  }
-}
-
-/**
- * Recalcula o ranking de um quiz a partir da aba "Respostas"
- * e reescreve as linhas do quiz na aba "Ranking".
- * Retorna um resumo com contagens.
- */
-/**
- * Recalcula o ranking de um quiz a partir da aba "Respostas"
- * e reescreve as linhas do quiz na aba "Ranking".
- * Funciona com cabeçalhos: Nome|Nome_Jogador, Quiz|Quiz_ID, Acertos|Pontuação, TempoMedio.
- */
-/**
- * Recalcula o ranking de um quiz a partir da aba "Respostas"
- * e reescreve as linhas do quiz na aba "Ranking".
- * Funciona com cabeçalhos: Nome|Nome_Jogador, Quiz|Quiz_ID, Acertos|Pontuação, TempoMedio.
- */
-function recomputarRankingQuiz(quizId) {
-  if (!quizId) throw new Error('quizId obrigatório');
-
-  // ===== Respostas =====
-  const shResp = SS.getSheetByName('Respostas');
-  if (!shResp) throw new Error('Aba "Respostas" não encontrada');
-
-  const data = shResp.getDataRange().getValues();
-  if (data.length <= 1) return { quizId, jogadores: 0, respostasConsideradas: 0 };
-
-  const hdr = data[0];
-  const idxNome   = 1; // B
-  const idxQuiz   = 2; // C
-  const idxPerg   = 3; // D
-  const idxResp   = hdr.indexOf('Resposta_Dada') >= 0 ? hdr.indexOf('Resposta_Dada') : 4; // E
-  const idxIdx    = hdr.indexOf('Resposta_Idx');     // I (se existir)
-  const idxTempo  = hdr.indexOf('Tempo_Segundos');   // J (se existir)
-
-  const gabarito = getGabaritoComCache(quizId) || {};
-
-  // Agrupa por jogador
-  const byPlayer = new Map();
-  let respostasConsideradas = 0;
-
-  for (let i = 1; i < data.length; i++) {
-    const r = data[i];
-    if (!r[idxQuiz] || String(r[idxQuiz]).trim() !== String(quizId).trim()) continue;
-
-    const nome = (r[idxNome] || '').toString().trim();
-    if (!nome) continue;
-
-    const idPerg = r[idxPerg];
-    if (idPerg == null || gabarito[idPerg] == null) continue; // pergunta fora do quiz/gabarito
-
-    // respostaNum: prefere índice; senão mapeia letra A..D
-    let respostaNum = null;
-    if (idxIdx >= 0 && typeof r[idxIdx] === 'number') {
-      respostaNum = r[idxIdx];
-    } else {
-      const respDada = r[idxResp];
-      if (respDada && respDada !== 'TEMPO_ESGOTADO') {
-        if (typeof respDada === 'string' && respDada.length === 1) {
-          const letra = respDada.toUpperCase();
-          if (['A','B','C','D'].includes(letra)) respostaNum = letra.charCodeAt(0) - 65;
-        } else if (typeof respDada === 'number') {
-          respostaNum = respDada;
-        }
-      }
-    }
-
-    // tempo (assume 30s quando ausente)
-    let t = 30;
-    if (idxTempo >= 0 && typeof r[idxTempo] === 'number') t = r[idxTempo];
-
-    if (!byPlayer.has(nome)) byPlayer.set(nome, { acertos: 0, somaTempo: 0, nTempo: 0 });
-    const agg = byPlayer.get(nome);
-
-    const corretaNum = gabarito[idPerg];
-    if (typeof corretaNum === 'number' && respostaNum === corretaNum) agg.acertos++;
-    agg.somaTempo += t;
-    agg.nTempo += 1;
-
-    respostasConsideradas++;
-  }
-
-  // ===== Ranking (compatível com seus cabeçalhos) =====
-  let shRank = SS.getSheetByName('Ranking');
-  if (!shRank) {
-    shRank = SS.insertSheet('Ranking');
-    shRank.getRange(1, 1, 1, 4).setValues([['Nome', 'Quiz', 'Acertos', 'TempoMedio']]);
-  }
-
-  // Cabeçalho atual da aba Ranking
-  const rankHdr = shRank.getRange(1, 1, 1, Math.max(4, shRank.getLastColumn())).getValues()[0];
-
-  // Descobre colunas por nomes possíveis
-  const colNome  = findHeaderIndex(rankHdr, ['Nome', 'Nome_Jogador'])        ?? 0;
-  const colQuiz  = findHeaderIndex(rankHdr, ['Quiz', 'Quiz_ID'])              ?? 1;
-  const colPts   = findHeaderIndex(rankHdr, ['Acertos', 'Pontuação', 'Pontos']) ?? 2;
-  let   colTempo = findHeaderIndex(rankHdr, ['TempoMedio', 'Tempo_Medio', 'Tempo médio (s)']);
-
-  // Garante coluna TempoMedio
-  if (colTempo == null) {
-    colTempo = rankHdr.length; // próxima coluna
-    shRank.getRange(1, colTempo + 1).setValue('TempoMedio');
-  }
-
-  // Remove TODAS as linhas do quiz (de baixo pra cima) — FIX do seu caso
-  const lastRowRank = shRank.getLastRow();
-  for (let i = lastRowRank; i >= 2; i--) {
-    const quizCell = shRank.getRange(i, colQuiz + 1).getValue();
-    if (String(quizCell).trim() === String(quizId).trim()) {
-      shRank.deleteRow(i);
-    }
-  }
-
-  // Monta as novas linhas
-  const rows = [];
-  for (const [nome, agg] of byPlayer.entries()) {
-    const tempoMedio = agg.nTempo ? (agg.somaTempo / agg.nTempo) : null;
-    const row = [];
-    row[colNome]  = nome;
-    row[colQuiz]  = quizId;
-    row[colPts]   = agg.acertos;
-    row[colTempo] = tempoMedio;
-    // ajusta tamanho para escrever contíguo desde a coluna 1
-    const maxIndex = Math.max(colNome, colQuiz, colPts, colTempo);
-    while (row.length < maxIndex + 1) row.push('');
-    rows.push(row);
-  }
-
-  if (rows.length) {
-    shRank.insertRowsAfter(1, rows.length);
-    shRank.getRange(2, 1, rows.length, Math.max(rankHdr.length, colTempo + 1)).setValues(
-      rows.map(r => {
-        // completa com vazio até o mesmo número de colunas do cabeçalho atual
-        const copy = r.slice();
-        while (copy.length < Math.max(rankHdr.length, colTempo + 1)) copy.push('');
-        return copy;
-      })
-    );
-  }
-
-  // Invalida cache do ranking do quiz
-  try { CacheService.getScriptCache().remove(`ranking_${quizId}`); } catch (_) {}
-
-  return { quizId, jogadores: rows.length, respostasConsideradas };
-}
-
-// Helper de cabeçalho: encontra índice pela primeira correspondência
-function findHeaderIndex(headerArray, aliases) {
-  for (const a of aliases) {
-    const idx = headerArray.findIndex(h => (h || '').toString().trim().toLowerCase() === a.toLowerCase());
-    if (idx >= 0) return idx;
-  }
-  return null;
-}
-
-/**
- * Recalcula o Ranking de TODOS os quizzes a partir da aba "Respostas".
- * Cuidado: pode ser pesado em planilhas gigantes. Use pontualmente.
- */
-function recomputarRankingTodos() {
-  const shResp = SS.getSheetByName('Respostas');
-  if (!shResp) throw new Error('Aba "Respostas" não encontrada');
-
-  const data = shResp.getDataRange().getValues();
-  if (data.length <= 1) return { quizzes: 0, totalJogadores: 0 };
-
-  const idxQuiz = 2; // C
-  const quizzes = [...new Set(
-    data.slice(1).map(r => r[idxQuiz]).filter(Boolean).map(v => String(v).trim())
-  )];
-
-  let totalJogadores = 0;
-  for (const q of quizzes) {
-    const res = recomputarRankingQuiz(q);
-    totalJogadores += res.jogadores || 0;
-  }
-  return { quizzes: quizzes.length, totalJogadores };
 }
